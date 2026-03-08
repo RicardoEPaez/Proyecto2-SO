@@ -16,7 +16,7 @@ public class SolicitudIO {
     private String ruta;
     private int tamanoEnBloques; // Solo para CREAR
     private int bloqueObjetivo; // Posición del primer bloque para SSTF, SCAN, etc.
-    private final String nuevoNombre; // Usado solo para operaciones de ACTUALIZAR
+    private final String nuevoNombre; // Usado solo para operaciones de ELIMINAR.
 
      public SolicitudIO(int idProceso, TipoOperacionIO tipo, String ruta, int tamanoEnBloques, int bloqueObjetivo, String nuevoNombre) {
         this.idProceso = idProceso;
@@ -32,7 +32,7 @@ public class SolicitudIO {
         this(idProceso, tipo, ruta, tamanoEnBloques, bloqueObjetivo, null);
     }
 
-    // Getters
+    // Getters y Setters....
     public int getIdProceso() { return idProceso; }
     public TipoOperacionIO getTipo() { return tipo; }
     public String getRuta() { return ruta; }
