@@ -16,7 +16,7 @@ public class SolicitudIO {
     private String ruta;
     private int tamanoEnBloques; // Solo para CREAR
     private int bloqueObjetivo; // Posición del primer bloque para SSTF, SCAN, etc.
-    private final String nuevoNombre; // Usado solo para operaciones de ELIMINAR.
+    private final String nuevoNombre; // Usado solo para operaciones de ACTUALIZAR.
 
      public SolicitudIO(int idProceso, TipoOperacionIO tipo, String ruta, int tamanoEnBloques, int bloqueObjetivo, String nuevoNombre) {
         this.idProceso = idProceso;

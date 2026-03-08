@@ -13,6 +13,6 @@ public enum Estado {
     NUEVO,
     LISTO,
     EJECUTANDO,
-    BLOQUEANDO,
-    TERMINADO,
+    BLOQUEADO,
+    TERMINADO
 }
