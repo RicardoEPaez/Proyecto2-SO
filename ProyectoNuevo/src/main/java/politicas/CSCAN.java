@@ -8,15 +8,9 @@ import Disco.PlanificadorDisco;
 import Procesos.SolicitudIO;
 import estructuras.Cola;
 import estructuras.ListaEnlazada;
-import estructuras.Nodo;
 
 /**
- *
- * @author ricar
- */
-
-/**
- * Implementación de CSCAN ajustada a la estructura ListaEnlazada de la cátedra.
+ * Implementación de CSCAN
  * @author ricar
  */
 public class CSCAN implements Planificacion {
