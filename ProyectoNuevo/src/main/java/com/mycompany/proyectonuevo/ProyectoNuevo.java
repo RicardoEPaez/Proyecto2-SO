@@ -11,6 +11,6 @@ package com.mycompany.proyectonuevo;
 public class ProyectoNuevo {
 
     public static void main(String[] args) {
-        System.out.println("Hello World!");
+        System.out.println("Proyecto de Operativos II");
+        }
     }
-}
