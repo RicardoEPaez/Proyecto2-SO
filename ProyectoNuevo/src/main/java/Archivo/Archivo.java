@@ -5,6 +5,7 @@
 package Archivo;
 
 import org.json.JSONObject;
+import java.util.concurrent.Semaphore;
 
 /**
  * Representa un archivo individual dentro del Sistema de Archivos Simulado.
@@ -18,6 +19,11 @@ public class Archivo extends EntradaSistemaArchivos {
     private int idProcesoCreador;
     private String color; // Para la UI
 
+    private int numLectores;
+    private final Semaphore mutexLectores;
+    private final Semaphore semaforoEscritura;
+    
+    
     /**
      * Constructor principal del archivo.
      * @param nombre El nombre exacto del archivo con su extensión.
@@ -33,6 +39,68 @@ public class Archivo extends EntradaSistemaArchivos {
         this.primerBloque = primerBloque;
         this.idProcesoCreador = idProcesoCreador;
         this.color = color;
+        
+        this.numLectores =0;
+        this.mutexLectores = new Semaphore(1);
+        this.semaforoEscritura = new Semaphore(1);
+    }
+    
+   // ==========================================================
+    // MÉTODOS PARA LECTORES (Varios pueden entrar a la vez)
+    // ==========================================================
+    
+    public void empezarLectura() {
+        try {
+            mutexLectores.acquire(); // Protegemos el contador
+            numLectores++;
+            if (numLectores == 1) {
+                // Si soy el PRIMER lector, tranco la puerta para que ningún ESCRITOR entre.
+                semaforoEscritura.acquire();
+            }
+            mutexLectores.release(); // Soltamos el contador para que otro lector pueda entrar
+            
+            System.out.println("[Archivo] Proceso leyendo " + this.getNombre() + ". Total lectores: " + numLectores);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+    
+    public void terminarLectura() {
+        try {
+            mutexLectores.acquire(); // Protegemos el contador
+            numLectores--;
+            System.out.println("[Archivo] Proceso dejó de leer " + this.getNombre() + ". Total lectores: " + numLectores);
+            
+            if (numLectores == 0) {
+                // Si soy el ÚLTIMO lector en irme, quito el candado de escritura.
+                semaforoEscritura.release();
+            }
+            mutexLectores.release();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+    
+    // ==========================================================
+    // MÉTODOS PARA ESCRITORES (Acceso totalmente exclusivo)
+    // ==========================================================
+    
+    public void empezarEscritura() {
+        try {
+            System.out.println("[Archivo] Proceso solicitando ESCRIBIR en " + this.getNombre() + "...");
+            // El escritor exige acceso exclusivo total. 
+            // Si hay lectores leyendo u otro escritor, SE DUERME AQUÍ hasta que terminen.
+            semaforoEscritura.acquire();
+            System.out.println("[Archivo] Candado puesto. Escribiendo de forma EXCLUSIVA en " + this.getNombre());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+    
+    public void terminarEscritura() {
+        System.out.println("[Archivo] Escritura terminada en " + this.getNombre() + ". Liberando archivo.");
+        // Termina de escribir y abre la puerta para los demás
+        semaforoEscritura.release(); 
     }
     
     /**
