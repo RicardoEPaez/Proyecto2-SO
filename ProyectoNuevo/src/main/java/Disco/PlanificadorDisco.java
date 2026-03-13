@@ -14,7 +14,7 @@ import politicas.direccionScan;
  *
  * @author ricar
  */
-public class PlanificadorDisco {
+public class PlanificadorDisco implements Runnable {
     private Planificacion politicaActual;
     
     // Estado del disco que las políticas necesitan conocer
@@ -22,11 +22,60 @@ public class PlanificadorDisco {
     private direccionScan direccionActual;
     public static final int MAX_BLOQUES = 100; // El tamaño total del disco
 
-    public PlanificadorDisco() {
+    private Cola<SolicitudIO> colaCompartida;
+    private volatile boolean enFuncionamiento;
+    
+    public PlanificadorDisco(Cola<SolicitudIO> colaCompartida) {
         // Por defecto, empezamos con FIFO y en la posición 0
         this.politicaActual = new FIFO();
         this.cabezalActual = 0;
         this.direccionActual = direccionScan.ARRIBA;
+        
+        this.colaCompartida = colaCompartida;
+        
+        this.enFuncionamiento = true;
+    }
+    
+    
+    // ==========================================
+    // EL MOTOR DEL DISCO (HILO CONSUMIDOR)
+    // ==========================================
+    @Override
+    public void run() {
+        System.out.println("[Hardware] Disco encendido y esperando peticiones...");
+        
+        while (enFuncionamiento) {
+            try {
+                // Revisamos de forma segura si la cola tiene solicitudes
+                if (!colaCompartida.estaVacia()) {
+                    
+                    // Extraemos la solicitud aplicando tu política actual
+                    SolicitudIO seleccionada = seleccionarSiguiente(colaCompartida);
+                    
+                    if (seleccionada != null) {
+                        int destino = seleccionada.getBloqueObjetivo();
+                        System.out.println("[Disco] Moviendo cabezal a bloque " + destino + " (Usando: " + getPoliticaActual() + ")");
+                        
+                        // SIMULACIÓN DE TIEMPO FÍSICO: El brazo del disco se mueve (500ms)
+                        Thread.sleep(500); 
+                        
+                        System.out.println("[Disco] Operación en bloque " + destino + " finalizada.");
+                        // NOTA: Aquí es donde (más adelante) le avisarás al PCB que pase de BLOQUEADO a LISTO.
+                        
+                        Procesos.GestorProcesos.notificarFinIO(seleccionada.getIdProceso());
+                    }
+                } else {
+                    // Si no hay peticiones, el disco descansa un momento para no saturar la CPU
+                    Thread.sleep(100);
+                }
+                
+            } catch (InterruptedException e) {
+                System.err.println("[Hardware] Disco interrumpido de emergencia.");
+                enFuncionamiento = false;
+                Thread.currentThread().interrupt();
+            }
+        }
+        System.out.println("[Hardware] Disco apagado.");
     }
     
     /**
@@ -71,6 +120,11 @@ public class PlanificadorDisco {
         
         return seleccionada;
     }
+    
+    public void detenerDisco(){
+        this.enFuncionamiento = false;
+    }
+    
     
     public void setDireccion(direccionScan direccion) {
         this.direccionActual = direccion;
