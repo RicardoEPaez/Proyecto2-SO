@@ -4,6 +4,8 @@
  */
 package Disco;
 
+import Journaling.GestorJournaling;
+import Procesos.GestorProcesos;
 import Procesos.SolicitudIO;
 import estructuras.Cola;
 import politicas.FIFO;
@@ -54,15 +56,21 @@ public class PlanificadorDisco implements Runnable {
                     
                     if (seleccionada != null) {
                         int destino = seleccionada.getBloqueObjetivo();
+                        Journaling.GestorJournaling.registrarOperacion(new Journaling.RegistroJournal(
+                            seleccionada.getTipo().toString(), 
+                            seleccionada.getRuta(), 
+                            seleccionada.getBloqueObjetivo()
+                        ));
                         System.out.println("[Disco] Moviendo cabezal a bloque " + destino + " (Usando: " + getPoliticaActual() + ")");
+                        Journaling.GestorJournaling.confirmarOperacion();
                         
                         // SIMULACIÓN DE TIEMPO FÍSICO: El brazo del disco se mueve (500ms)
                         Thread.sleep(500); 
                         
+                        
                         System.out.println("[Disco] Operación en bloque " + destino + " finalizada.");
                         // NOTA: Aquí es donde (más adelante) le avisarás al PCB que pase de BLOQUEADO a LISTO.
-                        
-                        Procesos.GestorProcesos.notificarFinIO(seleccionada.getIdProceso());
+                        GestorProcesos.notificarFinIO(seleccionada.getIdProceso());
                     }
                 } else {
                     // Si no hay peticiones, el disco descansa un momento para no saturar la CPU
