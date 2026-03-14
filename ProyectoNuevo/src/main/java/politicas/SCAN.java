@@ -26,35 +26,49 @@ public class SCAN implements Planificacion {
             temp.agregar(colaIO.desencolar());
         }
 
-        SolicitudIO mejorOpcion = null;
-        int distanciaMinima = Integer.MAX_VALUE;
+        SolicitudIO mejorOpcion = buscarMejor(temp, cabezalActual, direccionActual);
 
-        for (int i = 0; i < temp.getTamano(); i++) {
-            SolicitudIO actual = temp.get(i);
-            int bloque = actual.getBloqueObjetivo();
-
-            // Lógica SCAN: Solo atiende si está en la dirección actual
-            boolean enDireccion = (direccionActual == direccionScan.ARRIBA && bloque >= cabezalActual) ||
-                                 (direccionActual == direccionScan.ABAJO && bloque <= cabezalActual);
-
-            if (enDireccion) {
-                int distancia = Math.abs(bloque - cabezalActual);
-                if (distancia < distanciaMinima) {
-                    distanciaMinima = distancia;
-                    mejorOpcion = actual;
-                }
-            }
+        // --- EL ARREGLO ESTÁ AQUÍ ---
+        // Si no hubo nada en la dirección original (ej. llegamos a 180 y no hay más arriba)
+        if (mejorOpcion == null) {
+            // Cambiamos la dirección mentalmente para la segunda búsqueda
+            direccionScan nuevaDireccion = (direccionActual == direccionScan.ARRIBA) ? 
+                                            direccionScan.ABAJO : direccionScan.ARRIBA;
+            
+            mejorOpcion = buscarMejor(temp, cabezalActual, nuevaDireccion);
         }
 
-        // Si no encontró nada en esa dirección, hay que devolver todo y 
-        // el simulador debería cambiar la dirección (el "rebote").
+        // Devolvemos el resto a la cola
         for (int i = 0; i < temp.getTamano(); i++) {
-            SolicitudIO actual = temp.get(i);
-            if (actual != mejorOpcion) {
-                colaIO.encolar(actual);
+            SolicitudIO s = temp.get(i);
+            if (s != mejorOpcion) {
+                colaIO.encolar(s);
             }
         }
 
         return mejorOpcion;
+    }
+
+    // Método auxiliar para no repetir código de búsqueda
+    private SolicitudIO buscarMejor(ListaEnlazada<SolicitudIO> lista, int cabezal, direccionScan dir) {
+        SolicitudIO mejor = null;
+        int distanciaMinima = Integer.MAX_VALUE;
+
+        for (int i = 0; i < lista.getTamano(); i++) {
+            SolicitudIO actual = lista.get(i);
+            int bloque = actual.getBloqueObjetivo();
+
+            boolean enDireccion = (dir == direccionScan.ARRIBA && bloque >= cabezal) ||
+                                  (dir == direccionScan.ABAJO && bloque <= cabezal);
+
+            if (enDireccion) {
+                int distancia = Math.abs(bloque - cabezal);
+                if (distancia < distanciaMinima) {
+                    distanciaMinima = distancia;
+                    mejor = actual;
+                }
+            }
+        }
+        return mejor;
     }
 }
