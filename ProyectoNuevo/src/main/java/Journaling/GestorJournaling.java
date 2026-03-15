@@ -5,7 +5,7 @@
 
 package Journaling;
 /**
- * 
+ * Clase para el Gestor del Journaling
  * @author ricar
  */
 
