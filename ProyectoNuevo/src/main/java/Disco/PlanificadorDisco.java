@@ -4,10 +4,10 @@
  */
 package Disco;
 
-import Journaling.GestorJournaling;
 import Procesos.GestorProcesos;
 import Procesos.SolicitudIO;
 import estructuras.Cola;
+import java.util.concurrent.Semaphore;
 import politicas.FIFO;
 import politicas.Planificacion;
 import politicas.direccionScan;
@@ -26,6 +26,7 @@ public class PlanificadorDisco implements Runnable {
 
     private Cola<SolicitudIO> colaCompartida;
     private volatile boolean enFuncionamiento;
+    private Semaphore semaforoPeticiones;
     
     public PlanificadorDisco(Cola<SolicitudIO> colaCompartida) {
         // Por defecto, empezamos con FIFO y en la posición 0
@@ -34,12 +35,17 @@ public class PlanificadorDisco implements Runnable {
         this.direccionActual = direccionScan.ARRIBA;
         
         this.colaCompartida = colaCompartida;
-        
+        this.semaforoPeticiones = new Semaphore(0);
         this.enFuncionamiento = true;
     }
     
     
-    // ==========================================
+    public void registrarNuevaPeticion() {
+        semaforoPeticiones.release(); // Aumenta el semáforo en 1 y despierta al disco
+    }
+    
+    
+     // ==========================================
     // EL MOTOR DEL DISCO (HILO CONSUMIDOR)
     // ==========================================
     @Override
@@ -48,33 +54,32 @@ public class PlanificadorDisco implements Runnable {
         
         while (enFuncionamiento) {
             try {
-                // Revisamos de forma segura si la cola tiene solicitudes
-                if (!colaCompartida.estaVacia()) {
+                // NUEVO: El disco se queda DORMIDO aquí sin gastar CPU hasta que alguien haga release()
+                semaforoPeticiones.acquire(); 
+                
+                // Si despertó, es porque seguro hay algo en la cola
+                SolicitudIO seleccionada = seleccionarSiguiente(colaCompartida);
+                
+                if (seleccionada != null) {
+                    int destino = seleccionada.getBloqueObjetivo();
+                    Journaling.GestorJournaling.registrarOperacion(new Journaling.RegistroJournal(
+                        seleccionada.getTipo().toString(), 
+                        seleccionada.getRuta(), 
+                        seleccionada.getBloqueObjetivo()
+                    ));
                     
-                    // Extraemos la solicitud aplicando tu política actual
-                    SolicitudIO seleccionada = seleccionarSiguiente(colaCompartida);
+                    System.out.println("[Disco] Moviendo cabezal a bloque " + destino + " (Usando: " + getPoliticaActual() + ")");
                     
-                    if (seleccionada != null) {
-                        int destino = seleccionada.getBloqueObjetivo();
-                        Journaling.GestorJournaling.registrarOperacion(new Journaling.RegistroJournal(
-                            seleccionada.getTipo().toString(), 
-                            seleccionada.getRuta(), 
-                            seleccionada.getBloqueObjetivo()
-                        ));
-                        System.out.println("[Disco] Moviendo cabezal a bloque " + destino + " (Usando: " + getPoliticaActual() + ")");
-                        Journaling.GestorJournaling.confirmarOperacion();
-                        
-                        // SIMULACIÓN DE TIEMPO FÍSICO: El brazo del disco se mueve (500ms)
-                        Thread.sleep(500); 
-                        
-                        
-                        System.out.println("[Disco] Operación en bloque " + destino + " finalizada.");
-                        // NOTA: Aquí es donde (más adelante) le avisarás al PCB que pase de BLOQUEADO a LISTO.
-                        GestorProcesos.notificarFinIO(seleccionada.getIdProceso());
-                    }
-                } else {
-                    // Si no hay peticiones, el disco descansa un momento para no saturar la CPU
-                    Thread.sleep(100);
+                    // SIMULACIÓN DE TIEMPO FÍSICO (Movimiento del brazo)
+                    Thread.sleep(500); 
+                    
+                    // CORRECCIÓN: El commit ahora está DESPUÉS del movimiento físico
+                    Journaling.GestorJournaling.confirmarOperacion();
+                    
+                    System.out.println("[Disco] Operación en bloque " + destino + " finalizada.");
+                    
+                    // Notifica al PCB
+                    GestorProcesos.notificarFinIO(seleccionada.getIdProceso());
                 }
                 
             } catch (InterruptedException e) {
