@@ -3,10 +3,13 @@
  * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
  */
 package estructuras;
+
 import java.util.concurrent.Semaphore;
         
 /**
- *
+ * Estructura de datos Cola protegida para concurrencia.
+ * Se encarga únicamente de mantener la integridad de sus datos mediante Exclusión Mutua (Mutex).
+ * La lógica de sincronización (dormir/despertar) recae sobre el Productor y el Consumidor.
  * @author Ramon-Carrasquel
  * @param <T>
  */
@@ -15,9 +18,8 @@ public class Cola<T> {
     private Nodo<T> finalCola;
     private int tamano;
     
+    // Candado exclusivo para proteger los punteros frente y finalCola
     private final Semaphore mutex;
-    
-    private final Semaphore elementosDisponibles;
     
     public Cola(){
         this.frente = null;
@@ -25,16 +27,15 @@ public class Cola<T> {
         this.tamano = 0;
         
         this.mutex = new Semaphore(1);
-        this.elementosDisponibles = new Semaphore(0);
     }
     
-    /// Definimos el metodo para agregar un elemento al final de la cola (encolar)
+    // Agregar un elemento al final de la cola
     public void encolar(T dato){
         try {
-            mutex.acquire(); // Pedimos permiso para modificar la cola
+            mutex.acquire(); // Bloqueamos la cola para evitar que otro hilo la modifique a la vez
             
             Nodo<T> nuevoNodo = new Nodo<>(dato);
-            if (frente == null){ // Usamos comprobación directa para evitar deadlocks internos
+            if (frente == null){ 
                 frente = nuevoNodo;
                 finalCola = nuevoNodo;
             } else {
@@ -46,21 +47,14 @@ public class Cola<T> {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } finally {
-            mutex.release(); // Soltamos la cola
+            mutex.release(); // Soltamos la cola pase lo que pase
         }
-        
-        // ¡Señalamos que hay un nuevo elemento disponible!
-        // Esto despertará a cualquier hilo que esté durmiendo en desencolar()
-        elementosDisponibles.release(); 
     }
     
     /**
-     * Metodo para extraer un elemento específico de la cola sin importar su posición.
-     * Aunque rompe el comportamiento estandar de una cola, este método es vital para el Simulador.
-     * Permite al Planificador retirar procesos especificos que hayan sido cancelados o requieran ser movidos de estado antes de llegar al frente.
-     *
-     * @param objetivo El elemento (por ejemplo, un Proceso) que se desea eliminar.
-     * @return true si se encontró y sacó de la cola, false si no existe.
+     * Extraer un elemento específico de la cola sin importar su posición.
+     * @param objetivo El elemento que se desea buscar y eliminar de la cola.
+     * @return true si el elemento fue encontrado y eliminado exitosamente, false si la cola estaba vacía o el elemento no existe.
      */
     public boolean eliminar(T objetivo) {
         boolean eliminado = false;
@@ -68,10 +62,10 @@ public class Cola<T> {
             mutex.acquire();
             
             if (frente == null) {
-                return false; // Salimos rápido pero pasando por el finally para liberar el mutex
+                return false; 
             }
 
-            // Escenario A: El elemento a eliminar que buscamos esta al frente de la cola
+            // Escenario A: El elemento a eliminar está al frente
             if (frente.getContenido().equals(objetivo)) {
                 frente = frente.getSiguiente();
                 if (frente == null){
@@ -80,7 +74,7 @@ public class Cola<T> {
                 tamano--;
                 eliminado = true;
             } else {
-                // Escenario B: El elemento esta oculto en el medio o al final de la cola.
+                // Escenario B: El elemento está en el medio o al final
                 Nodo<T> nodoAnterior = frente;
                 Nodo<T> nodoActual = frente.getSiguiente();
 
@@ -105,23 +99,13 @@ public class Cola<T> {
             mutex.release();
         }
         
-        // Si logramos eliminar un elemento manualmente, debemos "robarle" un permiso
-        // al semáforo para que la cuenta de elementos siga coincidiendo con la realidad.
-        if (eliminado) {
-            elementosDisponibles.tryAcquire(); 
-        }
-        
         return eliminado;
     }
     
-    // Definimos el metodo para sacar el elemento del frente de la cola (desencolar)
+    // Sacar el elemento del frente de la cola
     public T desencolar(){
         T dato = null;
         try {
-            // 1. Si la cola está vacía, EL HILO DEL DISCO SE DUERME AQUÍ esperando un release()
-            elementosDisponibles.acquire(); 
-            
-            // 2. Si hay elementos, pedimos permiso para modificar los punteros
             mutex.acquire();
             
             if (frente != null) {
@@ -138,10 +122,10 @@ public class Cola<T> {
         } finally {
             mutex.release();
         }
-        return dato;
+        return dato; // Retornará null de forma segura si la cola estaba vacía
     }
     
-    // Para ver el primer elemento sin sacarlo de la cola
+    // Ver el primer elemento sin sacarlo de la cola
     public T obtenerFrente(){
         T dato = null;
         try {
@@ -157,7 +141,7 @@ public class Cola<T> {
         return dato;
     }
     
-    // Para determinar si la cola esta vacia
+    // Determinar si la cola está vacía
     public boolean estaVacia(){
         boolean vacia = true;
         try {
@@ -171,7 +155,7 @@ public class Cola<T> {
         return vacia;
     }
     
-    // Para oonocer el tamano de la cola
+    // Conocer el tamaño de la cola
     public int getTamano(){
         int t = 0;
         try {
