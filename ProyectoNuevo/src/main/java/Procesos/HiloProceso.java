@@ -67,7 +67,7 @@ public class HiloProceso implements Runnable {
             } else {
                 // Si por alguna razón el proceso no tenía solicitud, termina directamente
                 proceso.setEstado(Estado.TERMINADO);
-                System.out.println("[Gestor] Proceso " + proceso.getId() + " terminó su ejecución sin requerir I/O.");
+                System.out.println("[Gestor] Proceso " + proceso.getId() + " termino su ejecución sin requerir I/O.");
             }
 
         } catch (InterruptedException e) {

@@ -10,11 +10,62 @@ package Interfaz;
  */
 public class InterfazProyecto extends javax.swing.JFrame {
 
+    private Modo modoActual = Modo.ADMINISTRADOR;
+    private boolean sistemaPausado = false;
+    
     /**
      * Creates new form InterfazProyecto
      */
     public InterfazProyecto() {
         initComponents();
+        
+        // 1. Agrupar los botones para que sean mutuamente excluyentes
+        javax.swing.ButtonGroup grupoModos = new javax.swing.ButtonGroup();
+        grupoModos.add(jRadioButton1);
+        grupoModos.add(jRadioButton3);
+        
+        // 2. Seleccionar Administrador por defecto al abrir la ventana
+        jRadioButton1.setSelected(true);
+        
+        // --- REDIRIGIR CONSOLA AL JTEXTAREA ---
+        java.io.PrintStream printStream = new java.io.PrintStream(new CustomOutputStream(jTextArea1));
+        System.setOut(printStream);
+        System.setErr(printStream); // También captura los errores (System.err.println)
+        
+        // --- CONFIGURACIÓN DEL ÁRBOL DE ARCHIVOS (JTREE) ---
+        javax.swing.tree.DefaultMutableTreeNode raiz = new javax.swing.tree.DefaultMutableTreeNode("Disco (C:)");
+        javax.swing.tree.DefaultTreeModel modeloArbol = new javax.swing.tree.DefaultTreeModel(raiz);
+        jTree1.setModel(modeloArbol);
+        
+        // --- ACTUALIZADOR DE LA PANTALLA DE PROCESOS ---
+        // Usamos un Timer de Swing para actualizar la interfaz cada 500ms de forma segura
+        javax.swing.Timer timer = new javax.swing.Timer(500, (java.awt.event.ActionEvent e) -> {
+            actualizarPantallaProcesos();
+        });
+        timer.start();
+        
+        // --- ENCENDER LA CPU VIRTUAL ---
+        Procesos.GestorProcesos.iniciarCPU();
+        
+        // --- CONFIGURAR PERMISOS INICIALES ---
+        // Esto asegura que los botones coincidan con el modo ADMINISTRADOR al iniciar
+        actualizarPermisosBotones();
+    }
+    
+    private void actualizarPermisosBotones() {
+        // Determinamos si es administrador (true o false)
+        boolean esAdmin = (modoActual == Modo.ADMINISTRADOR);
+        
+        // Bloqueamos o desbloqueamos según el modo
+        jButton2.setEnabled(esAdmin); // Crear Directorio
+        jButton3.setEnabled(esAdmin); // Crear Archivo
+        jButton4.setEnabled(esAdmin); // Renombrar
+        jButton6.setEnabled(esAdmin); // Eliminar
+        jButton7.setEnabled(esAdmin); // Estadísticas
+        
+        // El botón Leer (jButton1) y Pausa (jButton8) siempre quedan activos
+        jButton1.setEnabled(true); 
+        jButton8.setEnabled(true);
     }
 
     /**
@@ -67,26 +118,76 @@ public class InterfazProyecto extends javax.swing.JFrame {
         jLabel1.setText("Modo");
 
         jRadioButton1.setText("Admin");
+        jRadioButton1.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jRadioButton1ActionPerformed(evt);
+            }
+        });
 
         jRadioButton3.setText("User");
+        jRadioButton3.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jRadioButton3ActionPerformed(evt);
+            }
+        });
 
         jLabel2.setText("Planificacion");
 
         jComboBox1.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "FIFO", "SSTF", "SCAN", "CSCAN" }));
+        jComboBox1.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jComboBox1ActionPerformed(evt);
+            }
+        });
 
         jButton2.setText("Crear Directorio");
+        jButton2.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton2ActionPerformed(evt);
+            }
+        });
 
         jButton3.setText("Crear Archivo");
+        jButton3.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton3ActionPerformed(evt);
+            }
+        });
 
         jButton1.setText("Leer");
+        jButton1.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton1ActionPerformed(evt);
+            }
+        });
 
         jButton4.setText("Renombrar");
+        jButton4.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton4ActionPerformed(evt);
+            }
+        });
 
         jButton6.setText("Eliminar");
+        jButton6.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton6ActionPerformed(evt);
+            }
+        });
 
         jButton7.setText("Estadistica");
+        jButton7.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton7ActionPerformed(evt);
+            }
+        });
 
         jButton8.setText("Pausa");
+        jButton8.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton8ActionPerformed(evt);
+            }
+        });
 
         jPanel6.setBorder(javax.swing.BorderFactory.createTitledBorder("Velocidad"));
 
@@ -224,6 +325,11 @@ public class InterfazProyecto extends javax.swing.JFrame {
         jScrollPane2.setViewportView(jTextArea1);
 
         jButton5.setText("Limpiar");
+        jButton5.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton5ActionPerformed(evt);
+            }
+        });
 
         javax.swing.GroupLayout jPanel3Layout = new javax.swing.GroupLayout(jPanel3);
         jPanel3.setLayout(jPanel3Layout);
@@ -364,6 +470,241 @@ public class InterfazProyecto extends javax.swing.JFrame {
         pack();
     }// </editor-fold>//GEN-END:initComponents
 
+    private void jRadioButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jRadioButton1ActionPerformed
+        // TODO add your handling code here:
+        modoActual = Modo.ADMINISTRADOR;
+        System.out.println("[Sistema] Modo cambiado a: ADMINISTRADOR");
+        
+        // --- LLAMADA AL NUEVO MÉTODO ---
+        actualizarPermisosBotones();
+    }//GEN-LAST:event_jRadioButton1ActionPerformed
+
+    private void jRadioButton3ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jRadioButton3ActionPerformed
+        // TODO add your handling code here:
+        modoActual = Modo.USUARIO;
+        System.out.println("[Sistema] Modo cambiado a: USUARIO");
+        
+        // --- LLAMADA AL NUEVO MÉTODO ---
+        actualizarPermisosBotones();
+    }//GEN-LAST:event_jRadioButton3ActionPerformed
+
+    private void jComboBox1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jComboBox1ActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_jComboBox1ActionPerformed
+
+    private void jButton5ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton5ActionPerformed
+        // TODO add your handling code here:
+        // Limpiar el log de eventos
+        jTextArea1.setText("");
+    }//GEN-LAST:event_jButton5ActionPerformed
+
+    private void jButton3ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton3ActionPerformed
+        javax.swing.tree.DefaultMutableTreeNode nodoSeleccionado = (javax.swing.tree.DefaultMutableTreeNode) jTree1.getLastSelectedPathComponent();
+        
+        if (nodoSeleccionado == null) {
+            javax.swing.JOptionPane.showMessageDialog(this, "Por favor, selecciona una carpeta donde guardar el archivo.", "Error", javax.swing.JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        String nombre = javax.swing.JOptionPane.showInputDialog(this, "Nombre del nuevo archivo (ej. documento.txt):");
+        
+        if (nombre != null && !nombre.trim().isEmpty()) {
+            
+            // --- NUEVO: CREAR EL PROCESO CON TU CONSTRUCTOR ---
+            // Nota: Pasamos 'null' a SolicitudIO temporalmente hasta que hagamos el Disco
+            Procesos.PCB nuevoProceso = new Procesos.PCB("Crear_Archivo_" + nombre, null);
+            nuevoProceso.setEstado(Procesos.Estado.LISTO);
+            Procesos.GestorProcesos.agregarProceso(nuevoProceso);
+            System.out.println("[Sistema] Solicitud enviada al Gestor de Procesos.");
+            
+            // --- ACTUALIZAR EL ÁRBOL (Visual) ---
+            javax.swing.tree.DefaultMutableTreeNode nuevoNodo = new javax.swing.tree.DefaultMutableTreeNode("📄 " + nombre);
+            javax.swing.tree.DefaultTreeModel modelo = (javax.swing.tree.DefaultTreeModel) jTree1.getModel();
+            
+            modelo.insertNodeInto(nuevoNodo, nodoSeleccionado, nodoSeleccionado.getChildCount());
+            jTree1.scrollPathToVisible(new javax.swing.tree.TreePath(nuevoNodo.getPath()));
+        }
+    }//GEN-LAST:event_jButton3ActionPerformed
+
+    private void jButton2ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton2ActionPerformed
+        // TODO add your handling code here:
+        javax.swing.tree.DefaultMutableTreeNode nodoSeleccionado = (javax.swing.tree.DefaultMutableTreeNode) jTree1.getLastSelectedPathComponent();
+        
+        if (nodoSeleccionado == null) {
+            javax.swing.JOptionPane.showMessageDialog(this, "Por favor, selecciona una carpeta en el arbol primero.", "Error", javax.swing.JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        String nombre = javax.swing.JOptionPane.showInputDialog(this, "Nombre del nuevo directorio:");
+        
+        if (nombre != null && !nombre.trim().isEmpty()) {
+            
+            // --- NUEVO: CREAR EL PROCESO ---
+            // Le ponemos "Crear_Directorio_" al nombre y pasamos null a la solicitud por ahora
+            Procesos.PCB nuevoProceso = new Procesos.PCB("Crear_Directorio_" + nombre, null);
+            nuevoProceso.setEstado(Procesos.Estado.LISTO);
+            Procesos.GestorProcesos.agregarProceso(nuevoProceso);
+            System.out.println("[Sistema] Solicitud de creacion de directorio enviada.");
+            
+            // --- ACTUALIZAR EL ÁRBOL (Visual/Temporal) ---
+            javax.swing.tree.DefaultMutableTreeNode nuevoNodo = new javax.swing.tree.DefaultMutableTreeNode("📁 " + nombre);
+            javax.swing.tree.DefaultTreeModel modelo = (javax.swing.tree.DefaultTreeModel) jTree1.getModel();
+            
+            modelo.insertNodeInto(nuevoNodo, nodoSeleccionado, nodoSeleccionado.getChildCount());
+            jTree1.scrollPathToVisible(new javax.swing.tree.TreePath(nuevoNodo.getPath()));
+        }
+    }//GEN-LAST:event_jButton2ActionPerformed
+
+    private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
+        // TODO add your handling code here:
+        javax.swing.tree.DefaultMutableTreeNode nodoSeleccionado = (javax.swing.tree.DefaultMutableTreeNode) jTree1.getLastSelectedPathComponent();
+        
+        if (nodoSeleccionado == null) {
+            javax.swing.JOptionPane.showMessageDialog(this, "Selecciona que deseas leer.", "Atencion", javax.swing.JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        String nombre = nodoSeleccionado.getUserObject().toString();
+        
+        // Verificamos que sea un archivo y no una carpeta
+        if (nombre.startsWith("📁") || nodoSeleccionado.isRoot()) {
+            javax.swing.JOptionPane.showMessageDialog(this, "Solo puedes leer archivos, no carpetas o discos.", "Accion denegada", javax.swing.JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        
+        // --- NUEVO: CREAR EL PROCESO ---
+        String nombreLimpio = nombre.substring(2).trim();
+        Procesos.PCB nuevoProceso = new Procesos.PCB("Leer_" + nombreLimpio, null);
+        nuevoProceso.setEstado(Procesos.Estado.LISTO);
+        Procesos.GestorProcesos.agregarProceso(nuevoProceso);
+        System.out.println("[Sistema] Solicitud de lectura enviada.");
+        
+        // Simulación visual
+        javax.swing.JOptionPane.showMessageDialog(this, "Leyendo el contenido de:\n" + nombre + "\n\n(Simulación de lectura exitosa)", "Visor de Archivos", javax.swing.JOptionPane.INFORMATION_MESSAGE);
+    }//GEN-LAST:event_jButton1ActionPerformed
+
+    private void jButton4ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton4ActionPerformed
+        // TODO add your handling code here:
+        javax.swing.tree.DefaultMutableTreeNode nodoSeleccionado = (javax.swing.tree.DefaultMutableTreeNode) jTree1.getLastSelectedPathComponent();
+        
+        if (nodoSeleccionado == null) {
+            javax.swing.JOptionPane.showMessageDialog(this, "Selecciona un archivo o carpeta para renombrar.", "Atencion", javax.swing.JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        if (nodoSeleccionado.isRoot()) {
+            javax.swing.JOptionPane.showMessageDialog(this, "No puedes renombrar la raíz del disco.", "Accion denegada", javax.swing.JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        
+        String nombreAntiguo = nodoSeleccionado.getUserObject().toString();
+        // Le quitamos el emoji para mostrar solo el texto limpio en el cuadro de diálogo
+        String textoLimpio = nombreAntiguo.substring(2).trim(); 
+        
+        String nuevoNombre = javax.swing.JOptionPane.showInputDialog(this, "Nuevo nombre:", textoLimpio);
+        
+        if (nuevoNombre != null && !nuevoNombre.trim().isEmpty()) {
+            
+            // --- NUEVO: CREAR EL PROCESO ---
+            Procesos.PCB nuevoProceso = new Procesos.PCB("Renombrar_" + textoLimpio, null);
+            nuevoProceso.setEstado(Procesos.Estado.LISTO);
+            Procesos.GestorProcesos.agregarProceso(nuevoProceso);
+            System.out.println("[Sistema] Solicitud de renombrado enviada.");
+
+            // --- ACTUALIZAR EL ÁRBOL (Visual/Temporal) ---
+            String emoji = nombreAntiguo.substring(0, 2);
+            nodoSeleccionado.setUserObject(emoji + " " + nuevoNombre);
+            
+            // Avisamos al modelo que el nodo cambió para que se actualice visualmente
+            ((javax.swing.tree.DefaultTreeModel) jTree1.getModel()).nodeChanged(nodoSeleccionado);
+            
+            System.out.println("Se renombró '" + textoLimpio + "' a '" + nuevoNombre + "'");
+        }
+    }//GEN-LAST:event_jButton4ActionPerformed
+
+    private void jButton6ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton6ActionPerformed
+        // TODO add your handling code here:
+        javax.swing.tree.DefaultMutableTreeNode nodoSeleccionado = (javax.swing.tree.DefaultMutableTreeNode) jTree1.getLastSelectedPathComponent();
+        
+        if (nodoSeleccionado == null) {
+            javax.swing.JOptionPane.showMessageDialog(this, "Selecciona el archivo o carpeta que deseas eliminar.");
+            return;
+        }
+        
+        if (nodoSeleccionado.isRoot()) {
+            javax.swing.JOptionPane.showMessageDialog(this, "¡No puedes eliminar el Disco Principal!", "Accion denegada", javax.swing.JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        
+        String nombreNodo = nodoSeleccionado.getUserObject().toString();
+        int confirmacion = javax.swing.JOptionPane.showConfirmDialog(this, "¿Seguro que deseas eliminar '" + nombreNodo + "'?", "Confirmar", javax.swing.JOptionPane.YES_NO_OPTION);
+        
+        if (confirmacion == javax.swing.JOptionPane.YES_OPTION) {
+            
+            // --- NUEVO: CREAR EL PROCESO ---
+            // Limpiamos el nombre un poco para que no salga el emoji en el nombre del proceso
+            String nombreLimpio = nombreNodo.substring(2).trim();
+            Procesos.PCB nuevoProceso = new Procesos.PCB("Eliminar_" + nombreLimpio, null);
+            nuevoProceso.setEstado(Procesos.Estado.LISTO);
+            Procesos.GestorProcesos.agregarProceso(nuevoProceso);
+            System.out.println("[Sistema] Solicitud de eliminacion enviada.");
+
+            // --- ACTUALIZAR EL ARBOL (Visual/Temporal) ---
+            javax.swing.tree.DefaultTreeModel modelo = (javax.swing.tree.DefaultTreeModel) jTree1.getModel();
+            modelo.removeNodeFromParent(nodoSeleccionado);
+        }
+    }//GEN-LAST:event_jButton6ActionPerformed
+
+    private void jButton7ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton7ActionPerformed
+        // TODO add your handling code here:
+        javax.swing.tree.DefaultTreeModel modelo = (javax.swing.tree.DefaultTreeModel) jTree1.getModel();
+        javax.swing.tree.DefaultMutableTreeNode raiz = (javax.swing.tree.DefaultMutableTreeNode) modelo.getRoot();
+        
+        int totalCarpetas = 0;
+        int totalArchivos = 0;
+        
+        // ¡Usamos 'var' como sugirió tu IDE!
+        var enumeracion = raiz.breadthFirstEnumeration();
+        
+        while (enumeracion.hasMoreElements()) {
+            javax.swing.tree.DefaultMutableTreeNode nodo = (javax.swing.tree.DefaultMutableTreeNode) enumeracion.nextElement();
+            String nombre = nodo.getUserObject().toString();
+            
+            if (nombre.startsWith("📁")) {
+                totalCarpetas++;
+            } else if (nombre.startsWith("📄")) {
+                totalArchivos++;
+            }
+        }
+        
+        // ¡Usamos un 'Text Block' como sugirió tu IDE!
+        String reporte = """
+                         === ESTADISTICAS DEL DISCO ===
+                         Carpetas creadas: %d
+                         Archivos creados: %d
+                         Total de elementos: %d""".formatted(totalCarpetas, totalArchivos, (totalCarpetas + totalArchivos));
+                         
+        System.out.println(reporte);
+        javax.swing.JOptionPane.showMessageDialog(this, reporte, "Estadísticas", javax.swing.JOptionPane.INFORMATION_MESSAGE);
+    }//GEN-LAST:event_jButton7ActionPerformed
+
+    private void jButton8ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton8ActionPerformed
+        // TODO add your handling code here:
+        // Invertimos el estado actual
+        sistemaPausado = !sistemaPausado;
+        
+        // Como sabemos que el botón se llama jButton8, lo usamos directamente:
+        if (sistemaPausado) {
+            jButton8.setText("Reanudar");
+            System.out.println("[Sistema] ⏸ SIMULACION PAUSADA.");
+            // TODO: Aquí luego llamaremos a un método para detener el reloj del procesador
+        } else {
+            jButton8.setText("Pausa");
+            System.out.println("[Sistema] ▶ SIMULACION REANUDADA.");
+            // TODO: Aquí luego llamaremos a un método para reanudar el reloj del procesador
+        }
+    }//GEN-LAST:event_jButton8ActionPerformed
+
     /**
      * @param args the command line arguments
      */
@@ -397,6 +738,56 @@ public class InterfazProyecto extends javax.swing.JFrame {
                 new InterfazProyecto().setVisible(true);
             }
         });
+    }
+    
+    // --- CLASE INTERNA PARA REDIRIGIR LA CONSOLA ---
+    class CustomOutputStream extends java.io.OutputStream {
+        private javax.swing.JTextArea textArea;
+
+        public CustomOutputStream(javax.swing.JTextArea textArea) {
+            this.textArea = textArea;
+        }
+
+        @Override
+        public void write(int b) throws java.io.IOException {
+            // Redirige el texto al JTextArea de forma segura para la interfaz gráfica
+            javax.swing.SwingUtilities.invokeLater(() -> {
+                textArea.append(String.valueOf((char) b));
+                // Mueve el scroll siempre hacia abajo automáticamente
+                textArea.setCaretPosition(textArea.getDocument().getLength());
+            });
+        }
+    }
+    
+    /**
+     * Este método actualiza la vista de los procesos en la interfaz.
+     * Deberá ser llamado cada vez que un proceso cambie de estado, se encole, o termine.
+     */
+    public void actualizarPantallaProcesos() {
+        StringBuilder sb = new StringBuilder();
+        
+        sb.append("=== LISTOS ===\n");
+        // TODO: Iterar sobre la cola de listos y hacer sb.append(proceso.toString()).append("\n");
+        sb.append("\n");
+        
+        sb.append("=== EN CPU ===\n");
+        // TODO: Mostrar el proceso actual en ejecución
+        sb.append("\n");
+        
+        sb.append("=== BLOQUEADOS ===\n");
+        // TODO: Mostrar los procesos esperando disco
+        sb.append("\n");
+        
+        sb.append("=== I/O EN EJECUCIÓN ===\n");
+        // TODO: Mostrar qué proceso está usando el disco en este instante
+        sb.append("\n");
+        
+        sb.append("=== COLA I/O ===\n");
+        // TODO: Mostrar la Cola de peticiones del disco
+        sb.append("\n");
+        
+        // Finalmente, enviamos todo ese texto construido al JTextArea
+        jTextArea2.setText(sb.toString());
     }
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
