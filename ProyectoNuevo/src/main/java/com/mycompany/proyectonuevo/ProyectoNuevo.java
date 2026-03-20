@@ -4,6 +4,8 @@
 
 package com.mycompany.proyectonuevo;
 
+import Interfaz.InterfazProyecto;
+
 /**
  *
  * @author ricar
@@ -11,6 +13,7 @@ package com.mycompany.proyectonuevo;
 public class ProyectoNuevo {
 
     public static void main(String[] args) {
-        System.out.println("Proyecto de Operativos II");
+        InterfazProyecto ventana = new InterfazProyecto();
+        ventana.setVisible(true);
         }
     }
