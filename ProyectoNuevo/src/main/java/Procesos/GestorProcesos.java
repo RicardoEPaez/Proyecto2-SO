@@ -125,5 +125,15 @@ public class GestorProcesos {
             }
         }).start();
     }
+    
+    // --- GETTERS NECESARIOS PARA EL REPORTE CSV ---
+    
+    public static PCB[] getTodosLosProcesos() {
+        return listaProcesos;
+    }
+
+    public static int getCantidadProcesos() {
+        return cantidadProcesos;
+    }
 }
 

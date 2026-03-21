@@ -15,6 +15,7 @@ public class InterfazProyecto extends javax.swing.JFrame {
     private int cabezalAnterior = 0;
     private Disco.PlanificadorDisco discoSimulado;
     private String rutaPruebaActual = "";
+    private Archivo.Directorio raizLogicaGlobal = new Archivo.Directorio("Disco (C:)", null);
     
     /**
      * Creates new form InterfazProyecto
@@ -639,12 +640,27 @@ public class InterfazProyecto extends javax.swing.JFrame {
         jMenu1.setText("Archivos");
 
         jMenuItem1.setText("Guardar Estado del Sistema (.json)");
+        jMenuItem1.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jMenuItem1ActionPerformed(evt);
+            }
+        });
         jMenu1.add(jMenuItem1);
 
         jMenuItem2.setText("Cargar Estado del Sistema (.json)");
+        jMenuItem2.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jMenuItem2ActionPerformed(evt);
+            }
+        });
         jMenu1.add(jMenuItem2);
 
         jMenuItem3.setText("Salir");
+        jMenuItem3.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jMenuItem3ActionPerformed(evt);
+            }
+        });
         jMenu1.add(jMenuItem3);
 
         jMenuBar1.add(jMenu1);
@@ -652,9 +668,19 @@ public class InterfazProyecto extends javax.swing.JFrame {
         jMenu2.setText("Reportes");
 
         jMenuItem4.setText("Reportar Resumen del Sistema (.txt)");
+        jMenuItem4.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jMenuItem4ActionPerformed(evt);
+            }
+        });
         jMenu2.add(jMenuItem4);
 
         jMenuItem5.setText("Exportar Estadisticas Procesos (.csv)");
+        jMenuItem5.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jMenuItem5ActionPerformed(evt);
+            }
+        });
         jMenu2.add(jMenuItem5);
 
         jMenuBar1.add(jMenu2);
@@ -942,6 +968,157 @@ public class InterfazProyecto extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_jButton8ActionPerformed
 
+    private void jMenuItem1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jMenuItem1ActionPerformed
+        // TODO add your handling code here:
+        javax.swing.JFileChooser fileChooser = new javax.swing.JFileChooser();
+        fileChooser.setDialogTitle("Guardar estado del sistema como...");
+        
+        int seleccion = fileChooser.showSaveDialog(this);
+        
+        if (seleccion == javax.swing.JFileChooser.APPROVE_OPTION) {
+            java.io.File archivoSeleccionado = fileChooser.getSelectedFile();
+            String ruta = archivoSeleccionado.getAbsolutePath();
+            
+            if (!ruta.toLowerCase().endsWith(".json")) {
+                ruta += ".json";
+            }
+            
+            // Actualizamos la lógica leyendo lo que hay en la pantalla antes de guardar
+            this.raizLogicaGlobal = reconstruirLogicaDesdeVisual(); 
+            
+            boolean exito = Utilidades.GestorJSON.guardarSistema(this.raizLogicaGlobal, ruta);
+            
+            if (exito) {
+                javax.swing.JOptionPane.showMessageDialog(this, "Sistema guardado exitosamente en:\n" + ruta, "Guardado Exitoso", javax.swing.JOptionPane.INFORMATION_MESSAGE);
+                System.out.println("[Sistema] Arbol guardado en: " + ruta);
+            } else {
+                javax.swing.JOptionPane.showMessageDialog(this, "Hubo un error al intentar guardar el archivo.", "Error", javax.swing.JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }//GEN-LAST:event_jMenuItem1ActionPerformed
+
+    private void jMenuItem2ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jMenuItem2ActionPerformed
+        // TODO add your handling code here:
+        javax.swing.JFileChooser fileChooser = new javax.swing.JFileChooser();
+        fileChooser.setDialogTitle("Seleccionar archivo JSON del sistema");
+        
+        // Mostrar la ventana de "Abrir"
+        int seleccion = fileChooser.showOpenDialog(this);
+        
+        if (seleccion == javax.swing.JFileChooser.APPROVE_OPTION) {
+            java.io.File archivoSeleccionado = fileChooser.getSelectedFile();
+            String ruta = archivoSeleccionado.getAbsolutePath();
+            
+            // Llamamos a tu método existente para que lea el archivo y pinte el árbol
+            cargarArbolDesdeJSON(ruta);
+            System.out.println("[Sistema] Estado cargado exitosamente desde: " + ruta);
+        }
+    }//GEN-LAST:event_jMenuItem2ActionPerformed
+
+    private void jMenuItem3ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jMenuItem3ActionPerformed
+        // TODO add your handling code here:
+        System.out.println("[Sistema] Cerrando el simulador...");
+        System.exit(0); // Cierra la aplicación de forma segura
+    }//GEN-LAST:event_jMenuItem3ActionPerformed
+
+    private void jMenuItem4ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jMenuItem4ActionPerformed
+        // TODO add your handling code here:
+        javax.swing.JFileChooser fileChooser = new javax.swing.JFileChooser();
+        fileChooser.setDialogTitle("Guardar Resumen del Sistema (.txt)");
+        
+        if (fileChooser.showSaveDialog(this) == javax.swing.JFileChooser.APPROVE_OPTION) {
+            java.io.File archivo = fileChooser.getSelectedFile();
+            String ruta = archivo.getAbsolutePath();
+            
+            // Asegurar que termine en .txt
+            if (!ruta.toLowerCase().endsWith(".txt")) {
+                ruta += ".txt";
+            }
+
+            try (java.io.FileWriter writer = new java.io.FileWriter(ruta)) {
+                writer.write("=========================================\n");
+                writer.write("       RESUMEN DEL SISTEMA DE ARCHIVOS   \n");
+                writer.write("=========================================\n\n");
+                
+                javax.swing.tree.DefaultTreeModel modelo = (javax.swing.tree.DefaultTreeModel) jTree1.getModel();
+                javax.swing.tree.DefaultMutableTreeNode raiz = (javax.swing.tree.DefaultMutableTreeNode) modelo.getRoot();
+                
+                int totalCarpetas = 0;
+                int totalArchivos = 0;
+                
+                // Recorremos el árbol visual para dibujarlo en el TXT
+                var enumeracion = raiz.preorderEnumeration(); // Usamos pre-orden para que salga de arriba hacia abajo
+                
+                while (enumeracion.hasMoreElements()) {
+                    javax.swing.tree.DefaultMutableTreeNode nodo = (javax.swing.tree.DefaultMutableTreeNode) enumeracion.nextElement();
+                    String nombre = nodo.getUserObject().toString();
+                    
+                    // Calculamos la sangría (espacios) basada en qué tan profunda está la carpeta
+                    StringBuilder sangria = new StringBuilder();
+                    for (int i = 0; i < nodo.getLevel(); i++) {
+                        sangria.append("    "); // 4 espacios por cada nivel
+                    }
+                    
+                    writer.write(sangria.toString() + nombre + "\n");
+                    
+                    if (nombre.startsWith("📁")) totalCarpetas++;
+                    else if (nombre.startsWith("📄")) totalArchivos++;
+                }
+                
+                writer.write("\n=========================================\n");
+                writer.write("ESTADISTICAS GLOBALES:\n");
+                writer.write("Total Carpetas: " + totalCarpetas + "\n");
+                writer.write("Total Archivos: " + totalArchivos + "\n");
+                writer.write("=========================================\n");
+
+                javax.swing.JOptionPane.showMessageDialog(this, "Resumen exportado exitosamente a:\n" + ruta, "Éxito", javax.swing.JOptionPane.INFORMATION_MESSAGE);
+                System.out.println("[Reporte] Resumen guardado en: " + ruta);
+                
+            } catch (java.io.IOException e) {
+                javax.swing.JOptionPane.showMessageDialog(this, "Error al guardar el archivo: " + e.getMessage(), "Error", javax.swing.JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }//GEN-LAST:event_jMenuItem4ActionPerformed
+
+    private void jMenuItem5ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jMenuItem5ActionPerformed
+        // TODO add your handling code here:
+        javax.swing.JFileChooser fileChooser = new javax.swing.JFileChooser();
+        fileChooser.setDialogTitle("Exportar Estadísticas de Procesos (.csv)");
+        
+        if (fileChooser.showSaveDialog(this) == javax.swing.JFileChooser.APPROVE_OPTION) {
+            java.io.File archivo = fileChooser.getSelectedFile();
+            String ruta = archivo.getAbsolutePath();
+            
+            // Asegurar que termine en .csv
+            if (!ruta.toLowerCase().endsWith(".csv")) {
+                ruta += ".csv";
+            }
+
+            try (java.io.FileWriter writer = new java.io.FileWriter(ruta)) {
+                // 1. Escribimos la cabecera del CSV
+                writer.write("ID Proceso,Nombre/Operacion,Estado Actual\n");
+                
+                // 2. Obtenemos el arreglo y la cantidad de procesos desde tu Gestor
+                Procesos.PCB[] procesos = Procesos.GestorProcesos.getTodosLosProcesos();
+                int cantidad = Procesos.GestorProcesos.getCantidadProcesos();
+                
+                // 3. Iteramos solo sobre los procesos que realmente existen
+                for (int i = 0; i < cantidad; i++) {
+                    Procesos.PCB p = procesos[i];
+                    if (p != null) { // Doble validación por seguridad
+                        writer.write(p.getId() + "," + p.getNombre() + "," + p.getEstado() + "\n");
+                    }
+                }
+
+                javax.swing.JOptionPane.showMessageDialog(this, "Datos de procesos exportados exitosamente a:\n" + ruta, "Éxito", javax.swing.JOptionPane.INFORMATION_MESSAGE);
+                System.out.println("[Reporte] CSV guardado en: " + ruta);
+                
+            } catch (java.io.IOException e) {
+                javax.swing.JOptionPane.showMessageDialog(this, "Error al exportar: " + e.getMessage(), "Error", javax.swing.JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }//GEN-LAST:event_jMenuItem5ActionPerformed
+
     /**
      * @param args the command line arguments
      */
@@ -1025,6 +1202,42 @@ public class InterfazProyecto extends javax.swing.JFrame {
         
         // Finalmente, enviamos todo ese texto construido al JTextArea
         jTextArea2.setText(sb.toString());
+    }
+    
+    private Archivo.Directorio reconstruirLogicaDesdeVisual() {
+        javax.swing.tree.DefaultTreeModel modelo = (javax.swing.tree.DefaultTreeModel) jTree1.getModel();
+        javax.swing.tree.DefaultMutableTreeNode raizVisual = (javax.swing.tree.DefaultMutableTreeNode) modelo.getRoot();
+        
+        // Creamos la raíz lógica limpia
+        Archivo.Directorio raizLogica = new Archivo.Directorio("Disco (C:)", null);
+        
+        // Empezamos la magia de la recursividad
+        recorrerYConstruir(raizVisual, raizLogica);
+        return raizLogica;
+    }
+
+    private void recorrerYConstruir(javax.swing.tree.DefaultMutableTreeNode nodoVisual, Archivo.Directorio dirLogicoPadre) {
+        for (int i = 0; i < nodoVisual.getChildCount(); i++) {
+            javax.swing.tree.DefaultMutableTreeNode hijoVisual = (javax.swing.tree.DefaultMutableTreeNode) nodoVisual.getChildAt(i);
+            String nombreNodo = hijoVisual.getUserObject().toString();
+            
+            if (nombreNodo.startsWith("📁")) {
+                // Si es carpeta, le quitamos el emoji y creamos el objeto Directorio
+                String nombreLimpio = nombreNodo.substring(2).trim();
+                Archivo.Directorio nuevoDir = new Archivo.Directorio(nombreLimpio, dirLogicoPadre);
+                dirLogicoPadre.getContenido().agregar(nuevoDir);
+                
+                // Llamada recursiva por si hay carpetas dentro de esta carpeta
+                recorrerYConstruir(hijoVisual, nuevoDir);
+                
+            } else if (nombreNodo.startsWith("📄")) {
+                // Si es archivo, creamos el objeto Archivo con valores simulados por ahora
+                String nombreLimpio = nombreNodo.substring(2).trim();
+                // Constructor: Archivo(nombre, padre, tamaño, bloque, idProceso, color)
+                Archivo.Archivo nuevoArch = new Archivo.Archivo(nombreLimpio, dirLogicoPadre, 1, 0, 1, "#FFFFFF");
+                dirLogicoPadre.getContenido().agregar(nuevoArch);
+            }
+        }
     }
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
