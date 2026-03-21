@@ -23,7 +23,7 @@ public class PlanificadorDisco implements Runnable {
     // Estado del disco que las políticas necesitan conocer
     private int cabezalActual;
     private direccionScan direccionActual;
-    public static final int MAX_BLOQUES = 100; // El tamaño total del disco
+    public static final int MAX_BLOQUES = 200; // El tamaño total del disco
 
     private Cola<SolicitudIO> colaCompartida;
     private volatile boolean enFuncionamiento;

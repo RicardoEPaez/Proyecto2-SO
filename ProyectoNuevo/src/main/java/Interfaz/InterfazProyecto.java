@@ -9,7 +9,7 @@ package Interfaz;
  * @author ricar
  */
 public class InterfazProyecto extends javax.swing.JFrame {
-    private javax.swing.JPanel[] bloquesDisco = new javax.swing.JPanel[100];
+    private javax.swing.JPanel[] bloquesDisco = new javax.swing.JPanel[200];
     private Modo modoActual = Modo.ADMINISTRADOR;
     private boolean sistemaPausado = false;
     private int cabezalAnterior = 0;
@@ -75,33 +75,28 @@ public class InterfazProyecto extends javax.swing.JFrame {
         // Limpiamos por si acaso NetBeans dejó algo oculto
         panelDiscoSimulador.removeAll();
 
-        for (int i = 0; i < 100; i++) {
-            // 1. Crear el cubito (JPanel)
+        // CAMBIA EL 100 o 200 POR bloquesDisco.length
+        for (int i = 0; i < bloquesDisco.length; i++) { 
             javax.swing.JPanel bloque = new javax.swing.JPanel();
             bloque.setLayout(new java.awt.BorderLayout());
-            bloque.setBorder(javax.swing.BorderFactory.createLineBorder(java.awt.Color.GRAY)); // Borde gris
-            bloque.setBackground(java.awt.Color.LIGHT_GRAY); // Fondo gris claro (bloque vacío)
+            bloque.setBorder(javax.swing.BorderFactory.createLineBorder(java.awt.Color.GRAY));
+            bloque.setBackground(java.awt.Color.LIGHT_GRAY);
 
-            // 2. Ponerle el numerito en el centro
             javax.swing.JLabel lblNumero = new javax.swing.JLabel(String.valueOf(i), javax.swing.SwingConstants.CENTER);
             lblNumero.setFont(new java.awt.Font("SansSerif", java.awt.Font.PLAIN, 10));
             bloque.add(lblNumero, java.awt.BorderLayout.CENTER);
 
-            // 3. Guardarlo en nuestro arreglo para manipularlo después
             bloquesDisco[i] = bloque;
-
-            // 4. Agregarlo a tu panelCuadriculaDisco de la interfaz
             panelDiscoSimulador.add(bloque);
         }
 
-        // Le decimos a la ventana que se actualice para mostrar los cambios
         panelDiscoSimulador.revalidate();
         panelDiscoSimulador.repaint();
     }
     
     public final void actualizarCabezalVisual(int nuevaPosicion) {
         // Protección: Si el bloque es mayor a 99, lo mapeamos para que entre en la cuadrícula
-        final int posSegura = (nuevaPosicion >= 100) ? (nuevaPosicion % 100) : nuevaPosicion;
+        final int posSegura = (nuevaPosicion >= bloquesDisco.length) ? (nuevaPosicion % bloquesDisco.length) : nuevaPosicion;
 
         javax.swing.SwingUtilities.invokeLater(() -> {
             try {
@@ -158,18 +153,35 @@ public class InterfazProyecto extends javax.swing.JFrame {
             for (int i = 0; i < requests.length(); i++) {
                 org.json.JSONObject req = requests.getJSONObject(i);
                 int posicion = req.getInt("pos");
-                String operacionStr = req.getString("op"); 
+                String operacionStr = req.getString("op").toUpperCase(); 
                 
-                // 1. Convertimos el String "READ", "UPDATE" al enum TipoOperacionIO de tu compañero
-                Procesos.TipoOperacionIO tipoOp = Procesos.TipoOperacionIO.valueOf(operacionStr.toUpperCase());
+                // --- NUEVO: TRADUCTOR DE INGLÉS A ESPAÑOL ---
+                Procesos.TipoOperacionIO tipoOp;
+                switch (operacionStr) {
+                    case "READ":
+                        tipoOp = Procesos.TipoOperacionIO.LEER;
+                        break;
+                    case "UPDATE":
+                        tipoOp = Procesos.TipoOperacionIO.ACTUALIZAR;
+                        break;
+                    case "DELETE":
+                        tipoOp = Procesos.TipoOperacionIO.ELIMINAR;
+                        break;
+                    case "CREATE": // Por si acaso hay algún JSON que diga CREATE
+                        tipoOp = Procesos.TipoOperacionIO.CREAR;
+                        break;
+                    default:
+                        tipoOp = Procesos.TipoOperacionIO.LEER; // Por defecto
+                        break;
+                }
+                // --------------------------------------------
                 
-                // 2. Usamos el constructor correcto: (idProceso, Tipo, Ruta, Tamaño, BloqueObjetivo)
                 // Usamos valores ficticios (1, "Simulacion", 1) para las variables que no importan en la prueba
                 Procesos.SolicitudIO nuevaSolicitud = new Procesos.SolicitudIO(1, tipoOp, "Simulacion", 1, posicion);
                 
-                // 3. Lo metemos a la cola
-                discoSimulado.getColaCompartida().encolar(nuevaSolicitud); //
-                discoSimulado.registrarNuevaPeticion(); // IMPORTANTE: Esto "despierta" al hilo del disco
+                // Lo metemos a la cola
+                discoSimulado.getColaCompartida().encolar(nuevaSolicitud); 
+                discoSimulado.registrarNuevaPeticion(); // "Despierta" al disco
             }
             System.out.println("Prueba cargada exitosamente.");
             
@@ -676,11 +688,6 @@ public class InterfazProyecto extends javax.swing.JFrame {
         jMenu2.add(jMenuItem4);
 
         jMenuItem5.setText("Exportar Estadisticas Procesos (.csv)");
-        jMenuItem5.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                jMenuItem5ActionPerformed(evt);
-            }
-        });
         jMenu2.add(jMenuItem5);
 
         jMenuBar1.add(jMenu2);
@@ -1000,18 +1007,44 @@ public class InterfazProyecto extends javax.swing.JFrame {
     private void jMenuItem2ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jMenuItem2ActionPerformed
         // TODO add your handling code here:
         javax.swing.JFileChooser fileChooser = new javax.swing.JFileChooser();
-        fileChooser.setDialogTitle("Seleccionar archivo JSON del sistema");
+        fileChooser.setDialogTitle("Cargar Archivo JSON");
         
-        // Mostrar la ventana de "Abrir"
-        int seleccion = fileChooser.showOpenDialog(this);
-        
-        if (seleccion == javax.swing.JFileChooser.APPROVE_OPTION) {
+        if (fileChooser.showOpenDialog(this) == javax.swing.JFileChooser.APPROVE_OPTION) {
             java.io.File archivoSeleccionado = fileChooser.getSelectedFile();
             String ruta = archivoSeleccionado.getAbsolutePath();
             
-            // Llamamos a tu método existente para que lea el archivo y pinte el árbol
-            cargarArbolDesdeJSON(ruta);
-            System.out.println("[Sistema] Estado cargado exitosamente desde: " + ruta);
+            try {
+                // Leemos todo el contenido del archivo como texto
+                String contenidoJSON = new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(ruta)));
+                
+                // Verificamos qué tipo de JSON es
+                if (contenidoJSON.contains("\"test_id\"") || contenidoJSON.contains("\"requests\"")) {
+                    // 1. Es el caso de prueba oficial de la profesora
+                    System.out.println("[Sistema] Detectado archivo de simulacion oficial. Iniciando...");
+                    
+                    // Limpiamos el disco visual por si acaso
+                    for (int i = 0; i < bloquesDisco.length; i++) {
+                        if (bloquesDisco[i] != null) {
+                            bloquesDisco[i].setBackground(java.awt.Color.LIGHT_GRAY);
+                        }
+                    }
+                    
+                    // Limpiamos la tabla
+                    javax.swing.table.DefaultTableModel modeloTabla = (javax.swing.table.DefaultTableModel) tablaAsignacion.getModel();
+                    modeloTabla.setRowCount(0);
+                    
+                    // Llamamos a tu método de prueba
+                    ejecutarPruebaJSON(ruta);
+                    
+                } else {
+                    // 2. Es un archivo de guardado normal de ustedes
+                    System.out.println("[Sistema] Detectado archivo de estado del sistema (Arbol).");
+                    cargarArbolDesdeJSON(ruta);
+                }
+                
+            } catch (Exception e) {
+                javax.swing.JOptionPane.showMessageDialog(this, "Error al leer el archivo: " + e.getMessage(), "Error", javax.swing.JOptionPane.ERROR_MESSAGE);
+            }
         }
     }//GEN-LAST:event_jMenuItem2ActionPerformed
 
@@ -1079,45 +1112,6 @@ public class InterfazProyecto extends javax.swing.JFrame {
             }
         }
     }//GEN-LAST:event_jMenuItem4ActionPerformed
-
-    private void jMenuItem5ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jMenuItem5ActionPerformed
-        // TODO add your handling code here:
-        javax.swing.JFileChooser fileChooser = new javax.swing.JFileChooser();
-        fileChooser.setDialogTitle("Exportar Estadísticas de Procesos (.csv)");
-        
-        if (fileChooser.showSaveDialog(this) == javax.swing.JFileChooser.APPROVE_OPTION) {
-            java.io.File archivo = fileChooser.getSelectedFile();
-            String ruta = archivo.getAbsolutePath();
-            
-            // Asegurar que termine en .csv
-            if (!ruta.toLowerCase().endsWith(".csv")) {
-                ruta += ".csv";
-            }
-
-            try (java.io.FileWriter writer = new java.io.FileWriter(ruta)) {
-                // 1. Escribimos la cabecera del CSV
-                writer.write("ID Proceso,Nombre/Operacion,Estado Actual\n");
-                
-                // 2. Obtenemos el arreglo y la cantidad de procesos desde tu Gestor
-                Procesos.PCB[] procesos = Procesos.GestorProcesos.getTodosLosProcesos();
-                int cantidad = Procesos.GestorProcesos.getCantidadProcesos();
-                
-                // 3. Iteramos solo sobre los procesos que realmente existen
-                for (int i = 0; i < cantidad; i++) {
-                    Procesos.PCB p = procesos[i];
-                    if (p != null) { // Doble validación por seguridad
-                        writer.write(p.getId() + "," + p.getNombre() + "," + p.getEstado() + "\n");
-                    }
-                }
-
-                javax.swing.JOptionPane.showMessageDialog(this, "Datos de procesos exportados exitosamente a:\n" + ruta, "Éxito", javax.swing.JOptionPane.INFORMATION_MESSAGE);
-                System.out.println("[Reporte] CSV guardado en: " + ruta);
-                
-            } catch (java.io.IOException e) {
-                javax.swing.JOptionPane.showMessageDialog(this, "Error al exportar: " + e.getMessage(), "Error", javax.swing.JOptionPane.ERROR_MESSAGE);
-            }
-        }
-    }//GEN-LAST:event_jMenuItem5ActionPerformed
 
     /**
      * @param args the command line arguments
