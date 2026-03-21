@@ -19,7 +19,7 @@ public class GestorProcesos {
     private static final int MAX_PROCESOS = 100;
     private static PCB[] listaProcesos = new PCB[MAX_PROCESOS];
     private static int cantidadProcesos = 0; // Contador para saber cuántos procesos hay
-
+    public static volatile int velocidadSimulacion = 1000;
     // Método para agregar un nuevo proceso al arreglo
     public static void agregarProceso(PCB proceso) {
         if (cantidadProcesos < MAX_PROCESOS) {
@@ -104,7 +104,7 @@ public class GestorProcesos {
                                 System.out.println("[CPU] " + listaProcesos[i].getNombre() + " entro a EJECUTANDO.");
                                 
                                 // Simulamos que la CPU lo procesa por 2 segundos
-                                Thread.sleep(2000); 
+                                Thread.sleep(velocidadSimulacion * 2 ); 
                                 
                                 // Como es una tarea de archivos, lo manda a BLOQUEADO (Esperando al disco)
                                 listaProcesos[i].setEstado(Estado.BLOQUEADO);
@@ -115,8 +115,8 @@ public class GestorProcesos {
                         }
                     }
                     
-                    // Descanso de 1 segundo antes de volver a revisar la fila
-                    Thread.sleep(1000); 
+                    
+                    Thread.sleep(velocidadSimulacion); 
                     
                 } catch (InterruptedException e) {
                     System.out.println("[CPU] Detenida.");

@@ -18,6 +18,8 @@ public class InterfazProyecto extends javax.swing.JFrame {
     private Archivo.Directorio raizLogicaGlobal = new Archivo.Directorio("Disco (C:)", null);
     private java.awt.Color[] coloresBloques = new java.awt.Color[100];
     private java.util.HashMap<String, java.awt.Color> mapaColoresArchivos = new java.util.HashMap<>();
+    private int cicloActual = 0;
+    private boolean simulacionIniciada = false;
     /**
      * Creates new form InterfazProyecto
      */
@@ -46,6 +48,8 @@ public class InterfazProyecto extends javax.swing.JFrame {
                 return celda;
             }
         });
+        
+        
 
         
         // 1. Inicializamos el planificador de disco vacio
@@ -85,11 +89,12 @@ public class InterfazProyecto extends javax.swing.JFrame {
         timer.start();
         
         // --- ENCENDER LA CPU VIRTUAL ---
-        Procesos.GestorProcesos.iniciarCPU();
+        //Procesos.GestorProcesos.iniciarCPU();
         
+       //iniciarRelojSistema();
         // --- CONFIGURAR PERMISOS INICIALES ---
         // Esto asegura que los botones coincidan con el modo ADMINISTRADOR al iniciar
-        actualizarPermisosBotones();
+        //actualizarPermisosBotones();
     }
     
     private void inicializarDiscoVisual() {
@@ -225,6 +230,12 @@ public class InterfazProyecto extends javax.swing.JFrame {
                 discoSimulado.registrarNuevaPeticion(); // "Despierta" al disco
             }
             System.out.println("Prueba cargada exitosamente.");
+            if (!simulacionIniciada) {
+                Procesos.GestorProcesos.iniciarCPU();
+                iniciarRelojSistema();
+                simulacionIniciada = true;
+                System.out.println("[Sistema] Simulación, Reloj y CPU iniciados.");
+            }
             
         } catch (org.json.JSONException e) {
             System.err.println("Error procesando el JSON: " + e.getMessage());
@@ -477,6 +488,11 @@ public class InterfazProyecto extends javax.swing.JFrame {
         jSlider1.setPaintLabels(true);
         jSlider1.setPaintTicks(true);
         jSlider1.setValue(500);
+        jSlider1.addChangeListener(new javax.swing.event.ChangeListener() {
+            public void stateChanged(javax.swing.event.ChangeEvent evt) {
+                jSlider1StateChanged(evt);
+            }
+        });
 
         jLabel3.setText("500 ms");
 
@@ -1210,6 +1226,17 @@ public class InterfazProyecto extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_jMenuItem4ActionPerformed
 
+    private void jSlider1StateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_jSlider1StateChanged
+       // Obtenemos el valor directamente en milisegundos (ej. 500)
+        int velocidadMs = jSlider1.getValue();
+        
+        // Actualizamos la etiqueta de la interfaz
+        jLabel3.setText(velocidadMs + " ms");
+        
+        // Le pasamos la nueva velocidad al Gestor de Procesos
+        Procesos.GestorProcesos.velocidadSimulacion = velocidadMs;
+    }//GEN-LAST:event_jSlider1StateChanged
+
     /**
      * @param args the command line arguments
      */
@@ -1329,6 +1356,28 @@ public class InterfazProyecto extends javax.swing.JFrame {
                 dirLogicoPadre.getContenido().agregar(nuevoArch);
             }
         }
+    }
+    
+    private void iniciarRelojSistema() {
+        new Thread(() -> {
+            while (!sistemaPausado) { // Si tienes pausa más adelante, esto servirá
+                try {
+                    // El reloj respeta la velocidad de la variable global
+                    Thread.sleep(Procesos.GestorProcesos.velocidadSimulacion);
+                    
+                    cicloActual++;
+                    
+                    // Actualizamos jLabel4 en la pantalla de forma segura
+                    javax.swing.SwingUtilities.invokeLater(() -> {
+                        jLabel4.setText("Ciclo: " + cicloActual);
+                    });
+                    
+                } catch (InterruptedException e) {
+                    System.out.println("Reloj detenido.");
+                    break;
+                }
+            }
+        }).start();
     }
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
