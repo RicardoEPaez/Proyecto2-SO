@@ -9,15 +9,23 @@ package Interfaz;
  * @author ricar
  */
 public class InterfazProyecto extends javax.swing.JFrame {
-
+    private javax.swing.JPanel[] bloquesDisco = new javax.swing.JPanel[100];
     private Modo modoActual = Modo.ADMINISTRADOR;
     private boolean sistemaPausado = false;
+    private int cabezalAnterior = 0;
+    private Disco.PlanificadorDisco discoSimulado;
     
     /**
      * Creates new form InterfazProyecto
      */
     public InterfazProyecto() {
         initComponents();
+        
+        inicializarDiscoVisual();
+        
+        actualizarCabezalVisual(50);
+        
+        ejecutarPruebaJSON();
         
         // 1. Agrupar los botones para que sean mutuamente excluyentes
         javax.swing.ButtonGroup grupoModos = new javax.swing.ButtonGroup();
@@ -50,6 +58,131 @@ public class InterfazProyecto extends javax.swing.JFrame {
         // --- CONFIGURAR PERMISOS INICIALES ---
         // Esto asegura que los botones coincidan con el modo ADMINISTRADOR al iniciar
         actualizarPermisosBotones();
+    }
+    
+    private void inicializarDiscoVisual() {
+        // Limpiamos por si acaso NetBeans dejó algo oculto
+        panelDiscoSimulador.removeAll();
+
+        for (int i = 0; i < 100; i++) {
+            // 1. Crear el cubito (JPanel)
+            javax.swing.JPanel bloque = new javax.swing.JPanel();
+            bloque.setLayout(new java.awt.BorderLayout());
+            bloque.setBorder(javax.swing.BorderFactory.createLineBorder(java.awt.Color.GRAY)); // Borde gris
+            bloque.setBackground(java.awt.Color.LIGHT_GRAY); // Fondo gris claro (bloque vacío)
+
+            // 2. Ponerle el numerito en el centro
+            javax.swing.JLabel lblNumero = new javax.swing.JLabel(String.valueOf(i), javax.swing.SwingConstants.CENTER);
+            lblNumero.setFont(new java.awt.Font("SansSerif", java.awt.Font.PLAIN, 10));
+            bloque.add(lblNumero, java.awt.BorderLayout.CENTER);
+
+            // 3. Guardarlo en nuestro arreglo para manipularlo después
+            bloquesDisco[i] = bloque;
+
+            // 4. Agregarlo a tu panelCuadriculaDisco de la interfaz
+            panelDiscoSimulador.add(bloque);
+        }
+
+        // Le decimos a la ventana que se actualice para mostrar los cambios
+        panelDiscoSimulador.revalidate();
+        panelDiscoSimulador.repaint();
+    }
+    
+    public void actualizarCabezalVisual(int nuevaPosicion) {
+        // Protección: Si el bloque es mayor a 99, lo mapeamos para que entre en la cuadrícula
+        final int posSegura = (nuevaPosicion >= 100) ? (nuevaPosicion % 100) : nuevaPosicion;
+
+        javax.swing.SwingUtilities.invokeLater(() -> {
+            try {
+                // 1. Despintar el bloque viejo (volverlo gris)
+                bloquesDisco[cabezalAnterior].setBackground(java.awt.Color.LIGHT_GRAY);
+                
+                // 2. Pintar el bloque nuevo de rojo
+                bloquesDisco[posSegura].setBackground(java.awt.Color.RED);
+                
+                // 3. Actualizar la etiqueta de texto
+                jLabel5.setText("Cabeza: " + posSegura);
+                
+                // Forzar a la ventana a redibujarse
+                panelDiscoSimulador.repaint();
+                
+                // 4. Guardar la nueva posición
+                cabezalAnterior = posSegura;
+                
+            } catch (Exception e) {
+                System.out.println("Error al pintar la UI: " + e.getMessage());
+            }
+        });
+    }
+    
+    public void ejecutarPruebaJSON() {
+        // Ejecutamos la prueba en un hilo separado para NO congelar la ventana visual
+        new Thread(() -> {
+            try {
+                System.out.println("=== INICIANDO PRUEBA JSON VISUAL ===");
+                String jsonString = "{\"test_id\": \"P1\",\"initial_head\": 50,\"requests\": [{\"pos\": 11, \"op\": \"READ\"},{\"pos\": 34, \"op\": \"READ\"},{\"pos\": 62, \"op\": \"UPDATE\"},{\"pos\": 70, \"op\": \"READ\"},{\"pos\": 95, \"op\": \"UPDATE\"},{\"pos\": 119, \"op\": \"DELETE\"},{\"pos\": 131, \"op\": \"UPDATE\"},{\"pos\": 180, \"op\": \"READ\"}],\"system_files\": {\"11\": {\"name\": \"boot_sect.bin\", \"blocks\": 2},\"34\": {\"name\": \"readme.txt\", \"blocks\": 1},\"62\": {\"name\": \"script.py\", \"blocks\": 8},\"70\": {\"name\": \"style.css\", \"blocks\": 6},\"95\": {\"name\": \"config.sys\", \"blocks\": 4},\"119\": {\"name\": \"image_01.png\", \"blocks\": 12},\"131\": {\"name\": \"data_log.csv\", \"blocks\": 28},\"180\": {\"name\": \"video_clip.mp4\", \"blocks\": 52}}}";
+
+                org.json.JSONObject jsonPrueba = new org.json.JSONObject(jsonString);
+                org.json.JSONArray requests = jsonPrueba.getJSONArray("requests");
+                org.json.JSONObject systemFiles = jsonPrueba.getJSONObject("system_files");
+
+                estructuras.Cola<Procesos.SolicitudIO> colaIO = new estructuras.Cola<>();
+                discoSimulado = new Disco.PlanificadorDisco(colaIO);
+                
+                // ¡AQUÍ ESTÁ LA MAGIA! Le pasamos esta ventana al disco
+                discoSimulado.setInterfazGrafica(this); 
+                
+                // Leemos lo que dice el ComboBox en la interfaz
+                String seleccion = jComboBox1.getSelectedItem().toString();
+                switch (seleccion) {
+                    case "FIFO":
+                        discoSimulado.setPolitica(new politicas.FIFO());
+                        break;
+                    case "SSTF":
+                        discoSimulado.setPolitica(new politicas.SSTF());
+                        break;
+                    case "SCAN":
+                        discoSimulado.setPolitica(new politicas.SCAN());
+                        break;
+                    case "CSCAN":
+                        discoSimulado.setPolitica(new politicas.CSCAN(discoSimulado));
+                        break;
+                }
+                
+                discoSimulado.setCabezal(50);
+                
+                Thread hiloDisco = new Thread(discoSimulado);
+                hiloDisco.start();
+
+                // Encolar las peticiones
+                for (int i = 0; i < requests.length(); i++) {
+                    org.json.JSONObject req = requests.getJSONObject(i);
+                    int posicion = req.getInt("pos");
+                    Procesos.TipoOperacionIO tipoOp = req.getString("op").equals("READ") ? Procesos.TipoOperacionIO.LEER : (req.getString("op").equals("UPDATE") ? Procesos.TipoOperacionIO.ACTUALIZAR : Procesos.TipoOperacionIO.ELIMINAR);
+                    
+                    // Como tu matriz visual es 100x100, y el JSON original tenía bloques hasta el 180, 
+                    // vamos a limitar la posición visual máxima a 99 para que no de error.
+                    // (Si la posición es > 99, la mapeamos a algo visualmente dentro de la grilla)
+                    int posVisual = posicion > 99 ? (posicion % 100) : posicion;
+
+                    Procesos.SolicitudIO nuevaSolicitud = new Procesos.SolicitudIO(i, tipoOp, "archivo", 1, posVisual);
+                    Procesos.PCB nuevoProceso = new Procesos.PCB("P" + i, nuevaSolicitud);
+                    Procesos.GestorProcesos.agregarProceso(nuevoProceso);
+                    colaIO.encolar(nuevaSolicitud);
+                    
+                    // Pequeña pausa para ver cómo se encolan
+                    Thread.sleep(200);
+                }
+
+                // Despertar al disco
+                for (int i = 0; i < requests.length(); i++) {
+                    discoSimulado.registrarNuevaPeticion();
+                }
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }).start();
     }
     
     private void actualizarPermisosBotones() {
@@ -108,7 +241,10 @@ public class InterfazProyecto extends javax.swing.JFrame {
         jPanel7 = new javax.swing.JPanel();
         jTabbedPane1 = new javax.swing.JTabbedPane();
         jPanel8 = new javax.swing.JPanel();
+        panelDiscoSimulador = new javax.swing.JPanel();
         jPanel9 = new javax.swing.JPanel();
+        jScrollPane4 = new javax.swing.JScrollPane();
+        tablaAsignacion = new javax.swing.JTable();
         jPanel10 = new javax.swing.JPanel();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
@@ -377,28 +513,43 @@ public class InterfazProyecto extends javax.swing.JFrame {
                 .addGap(0, 1, Short.MAX_VALUE))
         );
 
+        panelDiscoSimulador.setLayout(new java.awt.GridLayout(10, 10, 2, 2));
+
         javax.swing.GroupLayout jPanel8Layout = new javax.swing.GroupLayout(jPanel8);
         jPanel8.setLayout(jPanel8Layout);
         jPanel8Layout.setHorizontalGroup(
             jPanel8Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 672, Short.MAX_VALUE)
+            .addComponent(panelDiscoSimulador, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
         );
         jPanel8Layout.setVerticalGroup(
             jPanel8Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 355, Short.MAX_VALUE)
+            .addComponent(panelDiscoSimulador, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
         );
 
         jTabbedPane1.addTab("Simulador ", jPanel8);
+
+        tablaAsignacion.setModel(new javax.swing.table.DefaultTableModel(
+            new Object [][] {
+                {null, null, null},
+                {null, null, null},
+                {null, null, null},
+                {null, null, null}
+            },
+            new String [] {
+                "Nombre Archivo", "Bloque Inicial", "Tamaño"
+            }
+        ));
+        jScrollPane4.setViewportView(tablaAsignacion);
 
         javax.swing.GroupLayout jPanel9Layout = new javax.swing.GroupLayout(jPanel9);
         jPanel9.setLayout(jPanel9Layout);
         jPanel9Layout.setHorizontalGroup(
             jPanel9Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 672, Short.MAX_VALUE)
+            .addComponent(jScrollPane4, javax.swing.GroupLayout.DEFAULT_SIZE, 672, Short.MAX_VALUE)
         );
         jPanel9Layout.setVerticalGroup(
             jPanel9Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 355, Short.MAX_VALUE)
+            .addComponent(jScrollPane4, javax.swing.GroupLayout.DEFAULT_SIZE, 355, Short.MAX_VALUE)
         );
 
         jTabbedPane1.addTab("Tabla de Asignacion", jPanel9);
@@ -489,7 +640,20 @@ public class InterfazProyecto extends javax.swing.JFrame {
     }//GEN-LAST:event_jRadioButton3ActionPerformed
 
     private void jComboBox1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jComboBox1ActionPerformed
-        // TODO add your handling code here:
+        System.out.println(">>> REINICIANDO SIMULACIÓN CON: " + jComboBox1.getSelectedItem().toString());
+        
+        // 1. Limpiamos toda la cuadrícula (volvemos todos los bloques a gris)
+        for (int i = 0; i < 100; i++) {
+            if (bloquesDisco[i] != null) {
+                bloquesDisco[i].setBackground(java.awt.Color.LIGHT_GRAY);
+            }
+        }
+        
+        // 2. Reiniciamos el cabezal visual al centro (50)
+        actualizarCabezalVisual(50);
+        
+        // 3. Volvemos a lanzar la prueba desde cero
+        ejecutarPruebaJSON();
     }//GEN-LAST:event_jComboBox1ActionPerformed
 
     private void jButton5ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton5ActionPerformed
@@ -819,10 +983,13 @@ public class InterfazProyecto extends javax.swing.JFrame {
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JScrollPane jScrollPane2;
     private javax.swing.JScrollPane jScrollPane3;
+    private javax.swing.JScrollPane jScrollPane4;
     private javax.swing.JSlider jSlider1;
     private javax.swing.JTabbedPane jTabbedPane1;
     private javax.swing.JTextArea jTextArea1;
     private javax.swing.JTextArea jTextArea2;
     private javax.swing.JTree jTree1;
+    private javax.swing.JPanel panelDiscoSimulador;
+    private javax.swing.JTable tablaAsignacion;
     // End of variables declaration//GEN-END:variables
 }

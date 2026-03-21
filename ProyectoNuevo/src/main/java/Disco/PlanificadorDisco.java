@@ -4,6 +4,7 @@
  */
 package Disco;
 
+import Interfaz.InterfazProyecto;
 import Procesos.GestorProcesos;
 import Procesos.SolicitudIO;
 import estructuras.Cola;
@@ -27,6 +28,8 @@ public class PlanificadorDisco implements Runnable {
     private Cola<SolicitudIO> colaCompartida;
     private volatile boolean enFuncionamiento;
     private Semaphore semaforoPeticiones;
+    
+    private InterfazProyecto interfazGrafica;
     
     public PlanificadorDisco(Cola<SolicitudIO> colaCompartida) {
         // Por defecto, empezamos con FIFO y en la posición 0
@@ -73,8 +76,18 @@ public class PlanificadorDisco implements Runnable {
                     // SIMULACIÓN DE TIEMPO FÍSICO (Movimiento del brazo)
                     Thread.sleep(500); 
                     
+                    
+                    if (this.interfazGrafica != null) {
+                        System.out.println(">> Avisando a la ventana que pinte el bloque " + destino);
+                        this.interfazGrafica.actualizarCabezalVisual(destino);
+                    } else {
+                        System.out.println(">> ERROR: interfazGrafica es NULL, no puedo pintar.");
+                    }
+                    
+                   
                     // CORRECCIÓN: El commit ahora está DESPUÉS del movimiento físico
                     Journaling.GestorJournaling.confirmarOperacion();
+                    
                     
                     System.out.println("[Disco] Operación en bloque " + destino + " finalizada.");
                     
@@ -154,4 +167,9 @@ public class PlanificadorDisco implements Runnable {
     // Getters para que la UI pueda mostrar el estado
     public int getCabezalActual() { return cabezalActual; }
     public String getPoliticaActual() { return this.politicaActual.getClass().getSimpleName(); }
+    
+    
+    public void setInterfazGrafica(InterfazProyecto ui) {
+    this.interfazGrafica = ui;
+        }
 }
