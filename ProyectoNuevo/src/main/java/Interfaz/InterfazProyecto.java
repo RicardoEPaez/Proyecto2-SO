@@ -829,15 +829,33 @@ public class InterfazProyecto extends javax.swing.JFrame {
     }//GEN-LAST:event_jRadioButton3ActionPerformed
 
     private void jComboBox1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jComboBox1ActionPerformed
-        System.out.println(">>> REINICIANDO SIMULACION CON: " + jComboBox1.getSelectedItem().toString());
+        // TODO add your handling code here:
+        String planSeleccionado = jComboBox1.getSelectedItem().toString();
+        System.out.println(">>> CAMBIANDO POLÍTICA A: " + planSeleccionado);
         
-        // (El código de limpiar los bloques se mantiene igual...)
+        // Verificamos que la simulación ya esté corriendo antes de cambiarla
+        if (discoSimulado != null) {
+            // Dependiendo de lo que diga el ComboBox, instanciamos la política correcta
+            switch (planSeleccionado) {
+                case "FIFO":
+                discoSimulado.setPolitica(new politicas.FIFO());
+                break;
+            case "SSTF":
+                discoSimulado.setPolitica(new politicas.SSTF());
+                break;
+            case "SCAN":
+                discoSimulado.setPolitica(new politicas.SCAN());
+                break;
+            case "CSCAN":
+                discoSimulado.setPolitica(new politicas.CSCAN(discoSimulado)); // O como se llame tu clase CSCAN
+                break;
+            default:
+                System.out.println("Política no reconocida");
+                break;
+            }
         
-        // Si ya habíamos cargado una prueba antes, la volvemos a lanzar
-        if (!rutaPruebaActual.isEmpty()) {
-            ejecutarPruebaJSON(rutaPruebaActual);
-        } else {
-            System.out.println("Aun no se ha cargado ninguna prueba de simulacion.");
+        }else{
+            System.out.println("Aún no se ha cargado el disco ni la simulación.");
         }
     }//GEN-LAST:event_jComboBox1ActionPerformed
 
