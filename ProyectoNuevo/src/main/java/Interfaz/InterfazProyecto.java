@@ -16,7 +16,8 @@ public class InterfazProyecto extends javax.swing.JFrame {
     private Disco.PlanificadorDisco discoSimulado;
     private String rutaPruebaActual = "";
     private Archivo.Directorio raizLogicaGlobal = new Archivo.Directorio("Disco (C:)", null);
-    
+    private java.awt.Color[] coloresBloques = new java.awt.Color[100];
+    private java.util.HashMap<String, java.awt.Color> mapaColoresArchivos = new java.util.HashMap<>();
     /**
      * Creates new form InterfazProyecto
      */
@@ -26,6 +27,26 @@ public class InterfazProyecto extends javax.swing.JFrame {
         inicializarDiscoVisual();
         
         actualizarCabezalVisual(50);
+        
+        // Renderizador para la columna 0 ("Nombre Archivo")
+        tablaAsignacion.getColumnModel().getColumn(0).setCellRenderer(new javax.swing.table.DefaultTableCellRenderer() {
+            @Override
+            public java.awt.Component getTableCellRendererComponent(javax.swing.JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                java.awt.Component celda = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+                if (value != null) {
+                    // Buscamos el color en nuestra memoria usando el nombre del archivo
+                    java.awt.Color color = mapaColoresArchivos.get(value.toString());
+                    if (color != null) {
+                        celda.setBackground(color);
+                        celda.setForeground(java.awt.Color.BLACK); // Texto negro para que contraste con el pastel
+                    } else {
+                        celda.setBackground(java.awt.Color.WHITE);
+                    }
+                }
+                return celda;
+            }
+        });
+
         
         // 1. Inicializamos el planificador de disco vacio
         estructuras.Cola<Procesos.SolicitudIO> colaIO = new estructuras.Cola<>();
@@ -74,13 +95,14 @@ public class InterfazProyecto extends javax.swing.JFrame {
     private void inicializarDiscoVisual() {
         // Limpiamos por si acaso NetBeans dejó algo oculto
         panelDiscoSimulador.removeAll();
-
+        coloresBloques = new java.awt.Color[bloquesDisco.length];
         // CAMBIA EL 100 o 200 POR bloquesDisco.length
         for (int i = 0; i < bloquesDisco.length; i++) { 
             javax.swing.JPanel bloque = new javax.swing.JPanel();
             bloque.setLayout(new java.awt.BorderLayout());
             bloque.setBorder(javax.swing.BorderFactory.createLineBorder(java.awt.Color.GRAY));
             bloque.setBackground(java.awt.Color.LIGHT_GRAY);
+            coloresBloques[i] = java.awt.Color.LIGHT_GRAY;
 
             javax.swing.JLabel lblNumero = new javax.swing.JLabel(String.valueOf(i), javax.swing.SwingConstants.CENTER);
             lblNumero.setFont(new java.awt.Font("SansSerif", java.awt.Font.PLAIN, 10));
@@ -101,7 +123,7 @@ public class InterfazProyecto extends javax.swing.JFrame {
         javax.swing.SwingUtilities.invokeLater(() -> {
             try {
                 // 1. Despintar el bloque viejo (volverlo gris)
-                bloquesDisco[cabezalAnterior].setBackground(java.awt.Color.LIGHT_GRAY);
+                bloquesDisco[cabezalAnterior].setBackground(coloresBloques[cabezalAnterior]);
                 
                 // 2. Pintar el bloque nuevo de rojo
                 bloquesDisco[posSegura].setBackground(java.awt.Color.RED);
@@ -144,9 +166,9 @@ public class InterfazProyecto extends javax.swing.JFrame {
                 String nombreArchivo = fileData.getString("name");
                 int cantidadBloques = fileData.getInt("blocks");
                 int posicionInicial = Integer.parseInt(key);
-                
+                String colorHex = fileData.optString("color", "#FFFFFF");
                 // Pintamos los archivos de prueba en el disco visual
-                registrarArchivoEnGUI(nombreArchivo, cantidadBloques, posicionInicial);
+                registrarArchivoEnGUI(nombreArchivo, cantidadBloques, posicionInicial, colorHex);
                 
                 // --- NUEVO: AGREGAR AL ÁRBOL LÓGICO Y VISUAL ---
                 
@@ -209,14 +231,52 @@ public class InterfazProyecto extends javax.swing.JFrame {
         }
     }
     
-    private void registrarArchivoEnGUI(String nombre, int bloques, int posInicial) {
-        javax.swing.table.DefaultTableModel modeloTabla = (javax.swing.table.DefaultTableModel) tablaAsignacion.getModel();
-        modeloTabla.addRow(new Object[]{nombre, bloques, posInicial});
+    private java.awt.Color generarColorPastel() {
+        java.util.Random random = new java.util.Random();
+        // Usamos valores de 128 a 255 para asegurar que el color sea claro (pastel)
+        int r = random.nextInt(128) + 128;
+        int g = random.nextInt(128) + 128;
+        int b = random.nextInt(128) + 128;
+        return new java.awt.Color(r, g, b);
+    }
+
+    private java.awt.Color hexAColor(String hex) {
+        try {
+            return java.awt.Color.decode(hex);
+        } catch (Exception e) {
+            return generarColorPastel(); // Si el hex es inválido, generamos uno pastel
+        }
+    }
+    
+    private void registrarArchivoEnGUI(String nombre, int bloques, int posInicial, String colorHex) {
+        // 1. Convertimos el texto del JSON a un Color de Java
+        java.awt.Color colorArchivo = hexAColor(colorHex);
         
+        // Si el JSON no trae color o es blanco/negro, le damos un tono pastel aleatorio
+        if (colorHex == null || colorHex.equals("#FFFFFF") || colorHex.equals("#000000")) {
+            colorArchivo = generarColorPastel();
+        }
+        
+        // 2. Guardamos el color en nuestra "memoria" para que la tabla sepa cómo pintarse
+        mapaColoresArchivos.put(nombre, colorArchivo);
+
+        // 3. Agregamos la fila a la tabla (Ojo: Ajusté el orden a Nombre, Posición, Bloques 
+        // para que coincida con las columnas de tu diseño)
+        javax.swing.table.DefaultTableModel modeloTabla = (javax.swing.table.DefaultTableModel) tablaAsignacion.getModel();
+        modeloTabla.addRow(new Object[]{nombre, posInicial, bloques});
+        
+        // 4. Pintamos el disco
         for (int i = 0; i < bloques; i++) {
             int posicionActual = posInicial + i;
+            
             if (posicionActual < bloquesDisco.length) {
-                bloquesDisco[posicionActual].setBackground(java.awt.Color.RED);
+                // GUARDAMOS el color en la memoria de los bloques
+                coloresBloques[posicionActual] = colorArchivo;
+                
+                // Pintamos el bloque, a menos que el cabezal rojo esté parado exactamente ahí
+                if (posicionActual != cabezalAnterior) {
+                    bloquesDisco[posicionActual].setBackground(colorArchivo);
+                }
             }
         }
     }
@@ -460,7 +520,7 @@ public class InterfazProyecto extends javax.swing.JFrame {
                         .addGap(58, 58, 58)
                         .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(jLabel4, javax.swing.GroupLayout.PREFERRED_SIZE, 84, javax.swing.GroupLayout.PREFERRED_SIZE)
-                            .addComponent(jLabel5, javax.swing.GroupLayout.PREFERRED_SIZE, 67, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                            .addComponent(jLabel5, javax.swing.GroupLayout.PREFERRED_SIZE, 95, javax.swing.GroupLayout.PREFERRED_SIZE)))
                     .addGroup(jPanel1Layout.createSequentialGroup()
                         .addGap(24, 24, 24)
                         .addComponent(jLabel1, javax.swing.GroupLayout.PREFERRED_SIZE, 37, javax.swing.GroupLayout.PREFERRED_SIZE)
@@ -564,13 +624,13 @@ public class InterfazProyecto extends javax.swing.JFrame {
         );
         jPanel3Layout.setVerticalGroup(
             jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel3Layout.createSequentialGroup()
-                .addGap(66, 66, 66)
+            .addGroup(jPanel3Layout.createSequentialGroup()
+                .addContainerGap()
                 .addComponent(jButton5)
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
             .addGroup(jPanel3Layout.createSequentialGroup()
-                .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 132, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(0, 11, Short.MAX_VALUE))
+                .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 114, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(0, 29, Short.MAX_VALUE))
         );
 
         jPanel4.setBorder(javax.swing.BorderFactory.createTitledBorder("Cola de Procesos"));
