@@ -14,6 +14,7 @@ public class InterfazProyecto extends javax.swing.JFrame {
     private boolean sistemaPausado = false;
     private int cabezalAnterior = 0;
     private Disco.PlanificadorDisco discoSimulado;
+    private String rutaPruebaActual = "";
     
     /**
      * Creates new form InterfazProyecto
@@ -25,7 +26,16 @@ public class InterfazProyecto extends javax.swing.JFrame {
         
         actualizarCabezalVisual(50);
         
-        ejecutarPruebaJSON();
+        // 1. Inicializamos el planificador de disco vacio
+        estructuras.Cola<Procesos.SolicitudIO> colaIO = new estructuras.Cola<>();
+        discoSimulado = new Disco.PlanificadorDisco(colaIO);
+        discoSimulado.setInterfazGrafica(this); 
+        discoSimulado.setCabezal(50);
+        discoSimulado.setPolitica(new politicas.FIFO()); // Política por defecto
+        new Thread(discoSimulado).start(); 
+        
+        // 2. Cargamos el árbol de carpetas (TU código)
+        cargarArbolDesdeJSON("sistema_archivos.json");
         
         // 1. Agrupar los botones para que sean mutuamente excluyentes
         javax.swing.ButtonGroup grupoModos = new javax.swing.ButtonGroup();
@@ -88,7 +98,7 @@ public class InterfazProyecto extends javax.swing.JFrame {
         panelDiscoSimulador.repaint();
     }
     
-    public void actualizarCabezalVisual(int nuevaPosicion) {
+    public final void actualizarCabezalVisual(int nuevaPosicion) {
         // Protección: Si el bloque es mayor a 99, lo mapeamos para que entre en la cuadrícula
         final int posSegura = (nuevaPosicion >= 100) ? (nuevaPosicion % 100) : nuevaPosicion;
 
@@ -115,74 +125,68 @@ public class InterfazProyecto extends javax.swing.JFrame {
         });
     }
     
-    public void ejecutarPruebaJSON() {
-        // Ejecutamos la prueba en un hilo separado para NO congelar la ventana visual
-        new Thread(() -> {
-            try {
-                System.out.println("=== INICIANDO PRUEBA JSON VISUAL ===");
-                String jsonString = "{\"test_id\": \"P1\",\"initial_head\": 50,\"requests\": [{\"pos\": 11, \"op\": \"READ\"},{\"pos\": 34, \"op\": \"READ\"},{\"pos\": 62, \"op\": \"UPDATE\"},{\"pos\": 70, \"op\": \"READ\"},{\"pos\": 95, \"op\": \"UPDATE\"},{\"pos\": 119, \"op\": \"DELETE\"},{\"pos\": 131, \"op\": \"UPDATE\"},{\"pos\": 180, \"op\": \"READ\"}],\"system_files\": {\"11\": {\"name\": \"boot_sect.bin\", \"blocks\": 2},\"34\": {\"name\": \"readme.txt\", \"blocks\": 1},\"62\": {\"name\": \"script.py\", \"blocks\": 8},\"70\": {\"name\": \"style.css\", \"blocks\": 6},\"95\": {\"name\": \"config.sys\", \"blocks\": 4},\"119\": {\"name\": \"image_01.png\", \"blocks\": 12},\"131\": {\"name\": \"data_log.csv\", \"blocks\": 28},\"180\": {\"name\": \"video_clip.mp4\", \"blocks\": 52}}}";
+    public void ejecutarPruebaJSON(String rutaArchivoJSON) {
+        this.rutaPruebaActual = rutaArchivoJSON;
+        System.out.println("=== CARGANDO CASO DE PRUEBA ===");
+        org.json.JSONObject jsonPrueba = Utilidades.GestorJSON.cargarPruebaSimulacion(rutaArchivoJSON);
+        
+        if (jsonPrueba == null) {
+            System.err.println("Error: No se pudo cargar el archivo JSON de prueba.");
+            return;
+        }
 
-                org.json.JSONObject jsonPrueba = new org.json.JSONObject(jsonString);
-                org.json.JSONArray requests = jsonPrueba.getJSONArray("requests");
-                org.json.JSONObject systemFiles = jsonPrueba.getJSONObject("system_files");
-
-                estructuras.Cola<Procesos.SolicitudIO> colaIO = new estructuras.Cola<>();
-                discoSimulado = new Disco.PlanificadorDisco(colaIO);
-                
-                // ¡AQUÍ ESTÁ LA MAGIA! Le pasamos esta ventana al disco
-                discoSimulado.setInterfazGrafica(this); 
-                
-                // Leemos lo que dice el ComboBox en la interfaz
-                String seleccion = jComboBox1.getSelectedItem().toString();
-                switch (seleccion) {
-                    case "FIFO":
-                        discoSimulado.setPolitica(new politicas.FIFO());
-                        break;
-                    case "SSTF":
-                        discoSimulado.setPolitica(new politicas.SSTF());
-                        break;
-                    case "SCAN":
-                        discoSimulado.setPolitica(new politicas.SCAN());
-                        break;
-                    case "CSCAN":
-                        discoSimulado.setPolitica(new politicas.CSCAN(discoSimulado));
-                        break;
-                }
-                
-                discoSimulado.setCabezal(50);
-                
-                Thread hiloDisco = new Thread(discoSimulado);
-                hiloDisco.start();
-
-                // Encolar las peticiones
-                for (int i = 0; i < requests.length(); i++) {
-                    org.json.JSONObject req = requests.getJSONObject(i);
-                    int posicion = req.getInt("pos");
-                    Procesos.TipoOperacionIO tipoOp = req.getString("op").equals("READ") ? Procesos.TipoOperacionIO.LEER : (req.getString("op").equals("UPDATE") ? Procesos.TipoOperacionIO.ACTUALIZAR : Procesos.TipoOperacionIO.ELIMINAR);
-                    
-                    // Como tu matriz visual es 100x100, y el JSON original tenía bloques hasta el 180, 
-                    // vamos a limitar la posición visual máxima a 99 para que no de error.
-                    // (Si la posición es > 99, la mapeamos a algo visualmente dentro de la grilla)
-                    int posVisual = posicion > 99 ? (posicion % 100) : posicion;
-
-                    Procesos.SolicitudIO nuevaSolicitud = new Procesos.SolicitudIO(i, tipoOp, "archivo", 1, posVisual);
-                    Procesos.PCB nuevoProceso = new Procesos.PCB("P" + i, nuevaSolicitud);
-                    Procesos.GestorProcesos.agregarProceso(nuevoProceso);
-                    colaIO.encolar(nuevaSolicitud);
-                    
-                    // Pequeña pausa para ver cómo se encolan
-                    Thread.sleep(200);
-                }
-
-                // Despertar al disco
-                for (int i = 0; i < requests.length(); i++) {
-                    discoSimulado.registrarNuevaPeticion();
-                }
-
-            } catch (Exception e) {
-                e.printStackTrace();
+        try {
+            int cabezalInicial = jsonPrueba.getInt("initial_head");
+            actualizarCabezalVisual(cabezalInicial); 
+            if (discoSimulado != null) {
+                discoSimulado.setCabezal(cabezalInicial);
             }
-        }).start();
+
+            org.json.JSONObject systemFiles = jsonPrueba.getJSONObject("system_files");
+            for (String key : systemFiles.keySet()) {
+                org.json.JSONObject fileData = systemFiles.getJSONObject(key);
+                String nombreArchivo = fileData.getString("name");
+                int cantidadBloques = fileData.getInt("blocks");
+                int posicionInicial = Integer.parseInt(key);
+                
+                // Pintamos los archivos de prueba en el disco visual
+                registrarArchivoEnGUI(nombreArchivo, cantidadBloques, posicionInicial);
+            }
+
+            org.json.JSONArray requests = jsonPrueba.getJSONArray("requests");
+            for (int i = 0; i < requests.length(); i++) {
+                org.json.JSONObject req = requests.getJSONObject(i);
+                int posicion = req.getInt("pos");
+                String operacionStr = req.getString("op"); 
+                
+                // 1. Convertimos el String "READ", "UPDATE" al enum TipoOperacionIO de tu compañero
+                Procesos.TipoOperacionIO tipoOp = Procesos.TipoOperacionIO.valueOf(operacionStr.toUpperCase());
+                
+                // 2. Usamos el constructor correcto: (idProceso, Tipo, Ruta, Tamaño, BloqueObjetivo)
+                // Usamos valores ficticios (1, "Simulacion", 1) para las variables que no importan en la prueba
+                Procesos.SolicitudIO nuevaSolicitud = new Procesos.SolicitudIO(1, tipoOp, "Simulacion", 1, posicion);
+                
+                // 3. Lo metemos a la cola
+                discoSimulado.getColaCompartida().encolar(nuevaSolicitud); //
+                discoSimulado.registrarNuevaPeticion(); // IMPORTANTE: Esto "despierta" al hilo del disco
+            }
+            System.out.println("Prueba cargada exitosamente.");
+            
+        } catch (org.json.JSONException e) {
+            System.err.println("Error procesando el JSON: " + e.getMessage());
+        }
+    }
+    
+    private void registrarArchivoEnGUI(String nombre, int bloques, int posInicial) {
+        javax.swing.table.DefaultTableModel modeloTabla = (javax.swing.table.DefaultTableModel) tablaAsignacion.getModel();
+        modeloTabla.addRow(new Object[]{nombre, bloques, posInicial});
+        
+        for (int i = 0; i < bloques; i++) {
+            int posicionActual = posInicial + i;
+            if (posicionActual < bloquesDisco.length) {
+                bloquesDisco[posicionActual].setBackground(java.awt.Color.RED);
+            }
+        }
     }
     
     private void actualizarPermisosBotones() {
@@ -199,6 +203,46 @@ public class InterfazProyecto extends javax.swing.JFrame {
         // El botón Leer (jButton1) y Pausa (jButton8) siempre quedan activos
         jButton1.setEnabled(true); 
         jButton8.setEnabled(true);
+    }
+    
+    private void cargarArbolDesdeJSON(String rutaArchivo) {
+        Archivo.Directorio raizLogica = Utilidades.GestorJSON.cargarSistema(rutaArchivo);
+        javax.swing.tree.DefaultMutableTreeNode raizVisual;
+
+        if (raizLogica != null) {
+            System.out.println("[Sistema] Estado del disco cargado desde: " + rutaArchivo);
+            raizVisual = new javax.swing.tree.DefaultMutableTreeNode("Disco (C:)");
+            construirArbolVisual(raizLogica, raizVisual);
+        } else {
+            System.out.println("[Sistema] No se encontró estado guardado. Iniciando disco vacío.");
+            raizVisual = new javax.swing.tree.DefaultMutableTreeNode("Disco (C:)");
+        }
+        jTree1.setModel(new javax.swing.tree.DefaultTreeModel(raizVisual));
+    }
+    
+    private void construirArbolVisual(Archivo.Directorio dirLogico, javax.swing.tree.DefaultMutableTreeNode nodoVisual) {
+        // Aprovechamos el método toArray() de la ListaEnlazada que ustedes crearon
+        Object[] elementos = dirLogico.getContenido().toArray();
+        
+        for (Object elemento : elementos) {
+            if (elemento == null) continue;
+            
+            if (elemento instanceof Archivo.Directorio) {
+                // Si el elemento es una carpeta
+                Archivo.Directorio subDir = (Archivo.Directorio) elemento;
+                javax.swing.tree.DefaultMutableTreeNode nuevoNodoDir = new javax.swing.tree.DefaultMutableTreeNode("📁 " + subDir.getNombre());
+                nodoVisual.add(nuevoNodoDir);
+                
+                // Hacemos recursividad para ver si esta subcarpeta tiene más archivos adentro
+                construirArbolVisual(subDir, nuevoNodoDir); 
+                
+            } else if (elemento instanceof Archivo.Archivo) {
+                // Si el elemento es un archivo normal
+                Archivo.Archivo arch = (Archivo.Archivo) elemento;
+                javax.swing.tree.DefaultMutableTreeNode nuevoNodoArch = new javax.swing.tree.DefaultMutableTreeNode("📄 " + arch.getNombre());
+                nodoVisual.add(nuevoNodoArch);
+            }
+        }
     }
 
     /**
@@ -640,20 +684,16 @@ public class InterfazProyecto extends javax.swing.JFrame {
     }//GEN-LAST:event_jRadioButton3ActionPerformed
 
     private void jComboBox1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jComboBox1ActionPerformed
-        System.out.println(">>> REINICIANDO SIMULACIÓN CON: " + jComboBox1.getSelectedItem().toString());
+        System.out.println(">>> REINICIANDO SIMULACION CON: " + jComboBox1.getSelectedItem().toString());
         
-        // 1. Limpiamos toda la cuadrícula (volvemos todos los bloques a gris)
-        for (int i = 0; i < 100; i++) {
-            if (bloquesDisco[i] != null) {
-                bloquesDisco[i].setBackground(java.awt.Color.LIGHT_GRAY);
-            }
+        // (El código de limpiar los bloques se mantiene igual...)
+        
+        // Si ya habíamos cargado una prueba antes, la volvemos a lanzar
+        if (!rutaPruebaActual.isEmpty()) {
+            ejecutarPruebaJSON(rutaPruebaActual);
+        } else {
+            System.out.println("Aun no se ha cargado ninguna prueba de simulacion.");
         }
-        
-        // 2. Reiniciamos el cabezal visual al centro (50)
-        actualizarCabezalVisual(50);
-        
-        // 3. Volvemos a lanzar la prueba desde cero
-        ejecutarPruebaJSON();
     }//GEN-LAST:event_jComboBox1ActionPerformed
 
     private void jButton5ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton5ActionPerformed

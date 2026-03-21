@@ -89,7 +89,7 @@ public class PlanificadorDisco implements Runnable {
                     Journaling.GestorJournaling.confirmarOperacion();
                     
                     
-                    System.out.println("[Disco] Operación en bloque " + destino + " finalizada.");
+                    System.out.println("[Disco] Operacion en bloque " + destino + " finalizada.");
                     
                     // Notifica al PCB
                     GestorProcesos.notificarFinIO(seleccionada.getIdProceso());
@@ -110,7 +110,7 @@ public class PlanificadorDisco implements Runnable {
      */
     public void setPolitica(Planificacion nuevaPolitica) {
         this.politicaActual = nuevaPolitica;
-        System.out.println("Política de planificación cambiada a: " + nuevaPolitica.getClass().getSimpleName());
+        System.out.println("Politica de planificacion cambiada a: " + nuevaPolitica.getClass().getSimpleName());
     }
 
     /**
@@ -172,4 +172,8 @@ public class PlanificadorDisco implements Runnable {
     public void setInterfazGrafica(InterfazProyecto ui) {
     this.interfazGrafica = ui;
         }
+    
+    public estructuras.Cola<Procesos.SolicitudIO> getColaCompartida() {
+        return this.colaCompartida;
+    }
 }
