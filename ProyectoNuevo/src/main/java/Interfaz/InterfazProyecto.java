@@ -147,6 +147,25 @@ public class InterfazProyecto extends javax.swing.JFrame {
                 
                 // Pintamos los archivos de prueba en el disco visual
                 registrarArchivoEnGUI(nombreArchivo, cantidadBloques, posicionInicial);
+                
+                // --- NUEVO: AGREGAR AL ÁRBOL LÓGICO Y VISUAL ---
+                
+                // 1. Lo agregamos a la raíz lógica para que exista en el sistema
+                // (Usamos ID=1 y color blanco por defecto para la simulación)
+                Archivo.Archivo nuevoArch = new Archivo.Archivo(nombreArchivo, this.raizLogicaGlobal, cantidadBloques, posicionInicial, 1, "#FFFFFF");
+                this.raizLogicaGlobal.getContenido().agregar(nuevoArch);
+                
+                // 2. Lo agregamos visualmente al JTree para que aparezca en pantalla
+                javax.swing.tree.DefaultTreeModel modeloArbol = (javax.swing.tree.DefaultTreeModel) jTree1.getModel();
+                javax.swing.tree.DefaultMutableTreeNode raizVisual = (javax.swing.tree.DefaultMutableTreeNode) modeloArbol.getRoot();
+                javax.swing.tree.DefaultMutableTreeNode nuevoNodoArch = new javax.swing.tree.DefaultMutableTreeNode("📄 " + nombreArchivo);
+                
+                // Lo insertamos en la interfaz gráfica
+                modeloArbol.insertNodeInto(nuevoNodoArch, raizVisual, raizVisual.getChildCount());
+                
+                // Expandir el árbol para que se vean los archivos al cargar
+                jTree1.expandPath(new javax.swing.tree.TreePath(raizVisual.getPath()));
+                // ------------------------------------------------
             }
 
             org.json.JSONArray requests = jsonPrueba.getJSONArray("requests");
@@ -155,7 +174,7 @@ public class InterfazProyecto extends javax.swing.JFrame {
                 int posicion = req.getInt("pos");
                 String operacionStr = req.getString("op").toUpperCase(); 
                 
-                // --- NUEVO: TRADUCTOR DE INGLÉS A ESPAÑOL ---
+                // --- TRADUCTOR DE INGLÉS A ESPAÑOL ---
                 Procesos.TipoOperacionIO tipoOp;
                 switch (operacionStr) {
                     case "READ":
@@ -167,7 +186,7 @@ public class InterfazProyecto extends javax.swing.JFrame {
                     case "DELETE":
                         tipoOp = Procesos.TipoOperacionIO.ELIMINAR;
                         break;
-                    case "CREATE": // Por si acaso hay algún JSON que diga CREATE
+                    case "CREATE": 
                         tipoOp = Procesos.TipoOperacionIO.CREAR;
                         break;
                     default:
