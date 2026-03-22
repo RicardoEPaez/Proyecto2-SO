@@ -48,7 +48,7 @@ public class PlanificadorDisco implements Runnable {
     }
     
     
-     // ==========================================
+    // ==========================================
     // EL MOTOR DEL DISCO (HILO CONSUMIDOR)
     // ==========================================
     @Override
@@ -60,38 +60,50 @@ public class PlanificadorDisco implements Runnable {
                 // NUEVO: El disco se queda DORMIDO aquí sin gastar CPU hasta que alguien haga release()
                 semaforoPeticiones.acquire(); 
                 
+                // --- NUEVO: ¿Estamos en pausa? ---
+                if (this.interfazGrafica != null) {
+                    this.interfazGrafica.verificarPausa(); 
+                }
+                
                 // Si despertó, es porque seguro hay algo en la cola
                 SolicitudIO seleccionada = seleccionarSiguiente(colaCompartida);
                 
                 if (seleccionada != null) {
                     int destino = seleccionada.getBloqueObjetivo();
-                    Journaling.GestorJournaling.registrarOperacion(new Journaling.RegistroJournal(
-                        seleccionada.getTipo().toString(), 
-                        seleccionada.getRuta(), 
-                        seleccionada.getBloqueObjetivo()
-                    ));
                     
-                    System.out.println("[Disco] Moviendo cabezal a bloque " + destino + " (Usando: " + getPoliticaActual() + ")");
-                    
-                    // SIMULACIÓN DE TIEMPO FÍSICO (Movimiento del brazo)
-                    Thread.sleep(500); 
-                    
-                    
+                    // 1. Delegamos la validación visual y de concurrencia a la Interfaz
+                    boolean operacionExitosa = true;
                     if (this.interfazGrafica != null) {
-                        System.out.println(">> Avisando a la ventana que pinte el bloque " + destino);
-                        this.interfazGrafica.actualizarCabezalVisual(destino);
+                        operacionExitosa = this.interfazGrafica.ejecutarPeticionEnDiscoSegura(seleccionada);
                     } else {
-                        System.out.println(">> ERROR: interfazGrafica es NULL, no puedo pintar.");
+                        System.out.println(">> ERROR: interfazGrafica es NULL, no puedo validar ni pintar.");
                     }
                     
-                   
-                    // CORRECCIÓN: El commit ahora está DESPUÉS del movimiento físico
-                    Journaling.GestorJournaling.confirmarOperacion();
+                    // 2. Comprobamos si el bloque seguía existiendo
+                    if (operacionExitosa) {
+                        // SÍ ERA UN BLOQUE VÁLIDO: Registramos y hacemos el movimiento
+                        Journaling.GestorJournaling.registrarOperacion(new Journaling.RegistroJournal(
+                            seleccionada.getTipo().toString(), 
+                            seleccionada.getRuta(), 
+                            destino
+                        ));
+                        
+                        System.out.println("[Disco] Moviendo cabezal a bloque " + destino + " (Usando: " + getPoliticaActual() + ")");
+                        
+                        // SIMULACIÓN DE TIEMPO FÍSICO (Movimiento del brazo)
+                        Thread.sleep(500); 
+                        
+                        Journaling.GestorJournaling.confirmarOperacion();
+                        System.out.println("[Disco] Operacion en bloque " + destino + " finalizada.");
+                        
+                    } else {
+                        // ERA UNA PETICIÓN FANTASMA (El usuario borró el archivo en plena simulación)
+                        System.out.println("[Disco] ALERTA: Se ignoro la peticion al bloque " + destino + " porque esta vacio o fue eliminado.");
+                    }
                     
-                    
-                    System.out.println("[Disco] Operacion en bloque " + destino + " finalizada.");
-                    
-                    // Notifica al PCB
+                    // 3. Notifica al PCB (¡MUY IMPORTANTE!)
+                    // Independientemente de si fue exitosa o fantasma, hay que avisarle al Gestor 
+                    // de Procesos que la IO terminó para que el proceso no se quede BLOQUEADO para siempre.
                     GestorProcesos.notificarFinIO(seleccionada.getIdProceso());
                 }
                 

@@ -20,6 +20,11 @@ public class GestorProcesos {
     private static PCB[] listaProcesos = new PCB[MAX_PROCESOS];
     private static int cantidadProcesos = 0; // Contador para saber cuántos procesos hay
     public static volatile int velocidadSimulacion = 1000;
+    
+    // --- NUEVAS VARIABLES PARA LA PAUSA ---
+    private static volatile boolean cpuPausada = false;
+    private static final Object lockPausaCPU = new Object();
+    
     // Método para agregar un nuevo proceso al arreglo
     public static void agregarProceso(PCB proceso) {
         if (cantidadProcesos < MAX_PROCESOS) {
@@ -85,6 +90,10 @@ public class GestorProcesos {
         new Thread(() -> {
             while (true) {
                 try {
+                    // --- NUEVO: PUNTO DE CONTROL DE PAUSA ---
+                    // Si el sistema está pausado, el hilo se quedará congelado en esta línea
+                    verificarPausaCPU();
+                    
                     // 1. Verificar si la CPU está libre (nadie en EJECUTANDO)
                     boolean cpuLibre = true;
                     for (int i = 0; i < cantidadProcesos; i++) {
@@ -134,6 +143,31 @@ public class GestorProcesos {
 
     public static int getCantidadProcesos() {
         return cantidadProcesos;
+    }
+    
+    // --- NUEVOS MÉTODOS PARA CONTROLAR LA PAUSA ---
+    public static void pausarSimulacion() {
+        cpuPausada = true;
+    }
+    
+    public static void reanudarSimulacion() {
+        cpuPausada = false;
+        synchronized (lockPausaCPU) {
+            lockPausaCPU.notifyAll(); // ¡Despierta a la CPU!
+        }
+    }
+    
+    private static void verificarPausaCPU() {
+        synchronized (lockPausaCPU) {
+            while (cpuPausada) {
+                try {
+                    // La CPU se "duerme" aquí sin consumir recursos de tu PC real
+                    lockPausaCPU.wait(); 
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }
     }
 }
 

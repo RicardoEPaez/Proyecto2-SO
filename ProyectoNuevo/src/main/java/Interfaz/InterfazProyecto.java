@@ -20,6 +20,8 @@ public class InterfazProyecto extends javax.swing.JFrame {
     private java.util.HashMap<String, java.awt.Color> mapaColoresArchivos = new java.util.HashMap<>();
     private int cicloActual = 0;
     private boolean simulacionIniciada = false;
+    private final Object lockBloques = new Object();
+    public final Object lockPausa = new Object();
     /**
      * Creates new form InterfazProyecto
      */
@@ -849,30 +851,28 @@ public class InterfazProyecto extends javax.swing.JFrame {
         String planSeleccionado = jComboBox1.getSelectedItem().toString();
         System.out.println(">>> CAMBIANDO POLÍTICA A: " + planSeleccionado);
         
-        // Verificamos que la simulación ya esté corriendo antes de cambiarla
-        if (discoSimulado != null) {
-            // Dependiendo de lo que diga el ComboBox, instanciamos la política correcta
-            switch (planSeleccionado) {
-                case "FIFO":
-                discoSimulado.setPolitica(new politicas.FIFO());
-                break;
-            case "SSTF":
-                discoSimulado.setPolitica(new politicas.SSTF());
-                break;
-            case "SCAN":
-                discoSimulado.setPolitica(new politicas.SCAN());
-                break;
-            case "CSCAN":
-                discoSimulado.setPolitica(new politicas.CSCAN(discoSimulado)); // O como se llame tu clase CSCAN
-                break;
-            default:
-                System.out.println("Política no reconocida");
-                break;
-            }
-        
-        }else{
-            System.out.println("Aún no se ha cargado el disco ni la simulación.");
+        // 1. Cambiamos la política dinámicamente
+        switch (planSeleccionado) {
+            case "FIFO": discoSimulado.setPolitica(new politicas.FIFO()); break;
+            case "SSTF": discoSimulado.setPolitica(new politicas.SSTF()); break;
+            case "SCAN": discoSimulado.setPolitica(new politicas.SCAN()); break;
+            case "CSCAN": discoSimulado.setPolitica(new politicas.CSCAN(discoSimulado)); break;
         }
+        
+        // 2. Limpiamos toda la cuadrícula visualmente (solo los espacios grises que recorre el cabezal)
+        for (int i = 0; i < bloquesDisco.length; i++) {
+            // Asegúrate de no borrar los colores de los archivos ya cargados
+            if (bloquesDisco[i] != null && coloresBloques[i] == java.awt.Color.LIGHT_GRAY) {
+                bloquesDisco[i].setBackground(java.awt.Color.LIGHT_GRAY);
+            }
+        }
+        
+        // 3. Reiniciamos la posición del cabezal al punto de partida
+        discoSimulado.setCabezal(50);
+        actualizarCabezalVisual(50);
+        
+        // 4. Volvemos a mandar "trabajo" al disco para que arranque
+        reiniciarPeticionesSimulacion();
     }//GEN-LAST:event_jComboBox1ActionPerformed
 
     private void jButton5ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton5ActionPerformed
@@ -884,29 +884,94 @@ public class InterfazProyecto extends javax.swing.JFrame {
     private void jButton3ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton3ActionPerformed
         javax.swing.tree.DefaultMutableTreeNode nodoSeleccionado = (javax.swing.tree.DefaultMutableTreeNode) jTree1.getLastSelectedPathComponent();
         
+        // 1. Validaciones Iniciales
         if (nodoSeleccionado == null) {
             javax.swing.JOptionPane.showMessageDialog(this, "Por favor, selecciona una carpeta donde guardar el archivo.", "Error", javax.swing.JOptionPane.WARNING_MESSAGE);
             return;
         }
         
-        String nombre = javax.swing.JOptionPane.showInputDialog(this, "Nombre del nuevo archivo (ej. documento.txt):");
+        String nombreDirectorio = nodoSeleccionado.getUserObject().toString();
         
-        if (nombre != null && !nombre.trim().isEmpty()) {
-            
-            // --- NUEVO: CREAR EL PROCESO CON TU CONSTRUCTOR ---
-            // Nota: Pasamos 'null' a SolicitudIO temporalmente hasta que hagamos el Disco
-            Procesos.PCB nuevoProceso = new Procesos.PCB("Crear_Archivo_" + nombre, null);
-            nuevoProceso.setEstado(Procesos.Estado.LISTO);
-            Procesos.GestorProcesos.agregarProceso(nuevoProceso);
-            System.out.println("[Sistema] Solicitud enviada al Gestor de Procesos.");
-            
-            // --- ACTUALIZAR EL ÁRBOL (Visual) ---
-            javax.swing.tree.DefaultMutableTreeNode nuevoNodo = new javax.swing.tree.DefaultMutableTreeNode("📄 " + nombre);
-            javax.swing.tree.DefaultTreeModel modelo = (javax.swing.tree.DefaultTreeModel) jTree1.getModel();
-            
-            modelo.insertNodeInto(nuevoNodo, nodoSeleccionado, nodoSeleccionado.getChildCount());
-            jTree1.scrollPathToVisible(new javax.swing.tree.TreePath(nuevoNodo.getPath()));
+        // Validar que realmente se seleccionó un directorio (disco o carpeta) y no un archivo
+        if (!nodoSeleccionado.isRoot() && !nombreDirectorio.startsWith("📁")) {
+            javax.swing.JOptionPane.showMessageDialog(this, "Solo puedes crear archivos dentro de carpetas o en el Disco (C:).", "Acción denegada", javax.swing.JOptionPane.ERROR_MESSAGE);
+            return;
         }
+        
+        // 2. Solicitar Nombre del Archivo
+        String nombre = javax.swing.JOptionPane.showInputDialog(this, "Nombre del nuevo archivo (ej. documento.txt):");
+        if (nombre == null || nombre.trim().isEmpty()) {
+            return; // El usuario canceló o dejó en blanco
+        }
+        String nombreLimpio = nombre.trim();
+        
+        // 3. Solicitar Tamaño del Archivo en Bloques
+        String tamañoStr = javax.swing.JOptionPane.showInputDialog(this, "Tamaño del archivo en bloques (ej. 3):");
+        if (tamañoStr == null || tamañoStr.trim().isEmpty()) return;
+        
+        int tamanoBloques;
+        try {
+            tamanoBloques = Integer.parseInt(tamañoStr.trim());
+            if (tamanoBloques <= 0) throw new NumberFormatException();
+        } catch (NumberFormatException e) {
+            javax.swing.JOptionPane.showMessageDialog(this, "El tamaño debe ser un número entero mayor a 0.", "Error de Formato", javax.swing.JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        
+        // 4. Buscar Espacio Contiguo en el Disco
+        int bloqueInicial = buscarEspacioLibreContiguo(tamanoBloques);
+        if (bloqueInicial == -1) {
+            javax.swing.JOptionPane.showMessageDialog(this, "No hay espacio suficiente o contiguo en el disco para " + tamanoBloques + " bloques.", "Disco Lleno", javax.swing.JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        
+        // 5. Preparar el Color del Archivo
+        java.awt.Color colorNuevo = generarColorPastel();
+        // Convertir el color a Hexadecimal para el objeto Archivo lógico
+        String hexColor = String.format("#%02x%02x%02x", colorNuevo.getRed(), colorNuevo.getGreen(), colorNuevo.getBlue());
+        
+        // 6. BLOQUEO: Modificar el Disco Físico (Visual y Arreglos)
+        synchronized(lockBloques) {
+            mapaColoresArchivos.put(nombreLimpio, colorNuevo);
+            for (int i = 0; i < tamanoBloques; i++) {
+                int posActual = bloqueInicial + i;
+                
+                // Pintar en memoria
+                coloresBloques[posActual] = colorNuevo;
+                
+                // Pintar en la UI (respetando el cabezal rojo)
+                if (posActual != cabezalAnterior && bloquesDisco[posActual] != null) {
+                    bloquesDisco[posActual].setBackground(colorNuevo);
+                }
+            }
+        }
+        
+        // 7. Actualizar la Tabla de Asignación Visual
+        javax.swing.table.DefaultTableModel modeloTabla = (javax.swing.table.DefaultTableModel) tablaAsignacion.getModel();
+        modeloTabla.addRow(new Object[]{nombreLimpio, bloqueInicial, tamanoBloques});
+        
+        // 8. Crear la Estructura Lógica en Java (Archivo.Archivo)
+        int pIdSimulado = Procesos.GestorProcesos.getCantidadProcesos() + 1;
+        // Asumiendo que el constructor es: Archivo(nombre, dirPadre, tamaño, bloqueInicial, pid, color)
+        Archivo.Archivo archivoLogico = new Archivo.Archivo(nombreLimpio, null, tamanoBloques, bloqueInicial, pIdSimulado, hexColor);
+    
+        // Limpiamos el nombre del directorio padre para buscarlo en la estructura
+        String nombrePadreLimpio = nodoSeleccionado.isRoot() ? "Disco (C:)" : nombreDirectorio.substring(2).trim();
+        agregarArchivoLogico(raizLogicaGlobal, nombrePadreLimpio, archivoLogico);
+
+        // 9. Enviar la Solicitud al Gestor de Procesos (PCB)
+        // Nota: El 'null' aquí lo cambiarás luego cuando implementes la creación de SolicitudIO en caliente.
+        Procesos.PCB nuevoProceso = new Procesos.PCB("Crear_" + nombreLimpio, null);
+        nuevoProceso.setEstado(Procesos.Estado.LISTO);
+        Procesos.GestorProcesos.agregarProceso(nuevoProceso);
+        System.out.println("[Sistema] Solicitud de creación de archivo enviada.");
+
+        // 10. Actualizar el Árbol (Visual)
+        javax.swing.tree.DefaultMutableTreeNode nuevoNodo = new javax.swing.tree.DefaultMutableTreeNode("📄 " + nombreLimpio);
+        javax.swing.tree.DefaultTreeModel modeloArbol = (javax.swing.tree.DefaultTreeModel) jTree1.getModel();
+        modeloArbol.insertNodeInto(nuevoNodo, nodoSeleccionado, nodoSeleccionado.getChildCount());
+        jTree1.scrollPathToVisible(new javax.swing.tree.TreePath(nuevoNodo.getPath()));
+
     }//GEN-LAST:event_jButton3ActionPerformed
 
     private void jButton2ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton2ActionPerformed
@@ -918,19 +983,35 @@ public class InterfazProyecto extends javax.swing.JFrame {
             return;
         }
         
+        // --- VALIDACIÓN NUEVA ---
+        // Asegurarnos de que no estén intentando crear una carpeta DENTRO de un archivo (ej. dentro de un .txt)
+        String nombrePadreConEmoji = nodoSeleccionado.getUserObject().toString();
+        if (!nodoSeleccionado.isRoot() && !nombrePadreConEmoji.startsWith("📁")) {
+            javax.swing.JOptionPane.showMessageDialog(this, "Solo puedes crear directorios dentro de otras carpetas o en la raíz.", "Acción denegada", javax.swing.JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        
         String nombre = javax.swing.JOptionPane.showInputDialog(this, "Nombre del nuevo directorio:");
         
         if (nombre != null && !nombre.trim().isEmpty()) {
             
-            // --- NUEVO: CREAR EL PROCESO ---
-            // Le ponemos "Crear_Directorio_" al nombre y pasamos null a la solicitud por ahora
-            Procesos.PCB nuevoProceso = new Procesos.PCB("Crear_Directorio_" + nombre, null);
+            String nombreLimpio = nombre.trim();
+            
+            // --- NUEVO: CREAR EL DIRECTORIO EN LA MEMORIA LÓGICA DE JAVA ---
+            Archivo.Directorio nuevoDirLogico = new Archivo.Directorio(nombreLimpio, null);
+            String nombrePadreLimpio = nodoSeleccionado.isRoot() ? "Disco (C:)" : nombrePadreConEmoji.substring(2).trim();
+            
+            // Usamos la misma función auxiliar para enlazarlo en la memoria
+            agregarArchivoLogico(raizLogicaGlobal, nombrePadreLimpio, nuevoDirLogico);
+            
+            // --- CREAR EL PROCESO ---
+            Procesos.PCB nuevoProceso = new Procesos.PCB("Crear_Directorio_" + nombreLimpio, null);
             nuevoProceso.setEstado(Procesos.Estado.LISTO);
             Procesos.GestorProcesos.agregarProceso(nuevoProceso);
-            System.out.println("[Sistema] Solicitud de creacion de directorio enviada.");
+            System.out.println("[Sistema] Solicitud de creación de directorio enviada.");
             
-            // --- ACTUALIZAR EL ÁRBOL (Visual/Temporal) ---
-            javax.swing.tree.DefaultMutableTreeNode nuevoNodo = new javax.swing.tree.DefaultMutableTreeNode("📁 " + nombre);
+            // --- ACTUALIZAR EL ÁRBOL VISUAL ---
+            javax.swing.tree.DefaultMutableTreeNode nuevoNodo = new javax.swing.tree.DefaultMutableTreeNode("📁 " + nombreLimpio);
             javax.swing.tree.DefaultTreeModel modelo = (javax.swing.tree.DefaultTreeModel) jTree1.getModel();
             
             modelo.insertNodeInto(nuevoNodo, nodoSeleccionado, nodoSeleccionado.getChildCount());
@@ -955,65 +1036,120 @@ public class InterfazProyecto extends javax.swing.JFrame {
             return;
         }
         
-        // --- NUEVO: CREAR EL PROCESO ---
         String nombreLimpio = nombre.substring(2).trim();
-        Procesos.PCB nuevoProceso = new Procesos.PCB("Leer_" + nombreLimpio, null);
+        
+        // --- PASO 1: Buscar el bloque inicial en la Tabla de Asignación ---
+        int bloqueInicial = -1;
+        javax.swing.table.DefaultTableModel modeloTabla = (javax.swing.table.DefaultTableModel) tablaAsignacion.getModel();
+        
+        for (int i = 0; i < modeloTabla.getRowCount(); i++) {
+            if (modeloTabla.getValueAt(i, 0) != null && modeloTabla.getValueAt(i, 0).toString().equals(nombreLimpio)) {
+                bloqueInicial = Integer.parseInt(modeloTabla.getValueAt(i, 1).toString());
+                break;
+            }
+        }
+        
+        if (bloqueInicial == -1) {
+            javax.swing.JOptionPane.showMessageDialog(this, "Error: No se encontró el bloque físico del archivo.", "Error", javax.swing.JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        // --- PASO 2: CREAR LA SOLICITUD Y EL PROCESO REAL ---
+        int idProceso = Procesos.GestorProcesos.getCantidadProcesos();
+        // Asumiendo constructor: SolicitudIO(idProceso, tipoOperacion, ruta, tamaño, bloqueObjetivo)
+        Procesos.SolicitudIO peticionLectura = new Procesos.SolicitudIO(idProceso, Procesos.TipoOperacionIO.LEER, nombreLimpio, 1, bloqueInicial);
+        
+        Procesos.PCB nuevoProceso = new Procesos.PCB("Leer_" + nombreLimpio, peticionLectura);
         nuevoProceso.setEstado(Procesos.Estado.LISTO);
         Procesos.GestorProcesos.agregarProceso(nuevoProceso);
-        System.out.println("[Sistema] Solicitud de lectura enviada.");
         
-        // Simulación visual
-        javax.swing.JOptionPane.showMessageDialog(this, "Leyendo el contenido de:\n" + nombre + "\n\n(Simulación de lectura exitosa)", "Visor de Archivos", javax.swing.JOptionPane.INFORMATION_MESSAGE);
+        // --- PASO 3: MANDAR AL DISCO Y DESPERTARLO ---
+        if (discoSimulado != null) {
+            discoSimulado.getColaCompartida().encolar(peticionLectura);
+            discoSimulado.registrarNuevaPeticion(); // ¡Esto hace el release() del semáforo!
+            System.out.println("[Sistema] Solicitud de lectura encolada para el bloque " + bloqueInicial);
+        }
+
+        // Simulación visual inicial
+        javax.swing.JOptionPane.showMessageDialog(this, "Solicitud de lectura enviada.\nObserva el disco moverse hacia el bloque " + bloqueInicial + ".", "Leyendo Archivo", javax.swing.JOptionPane.INFORMATION_MESSAGE);
     }//GEN-LAST:event_jButton1ActionPerformed
 
     private void jButton4ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton4ActionPerformed
         // TODO add your handling code here:
         javax.swing.tree.DefaultMutableTreeNode nodoSeleccionado = (javax.swing.tree.DefaultMutableTreeNode) jTree1.getLastSelectedPathComponent();
-        
+    
+        // 1. Validaciones Iniciales
         if (nodoSeleccionado == null) {
-            javax.swing.JOptionPane.showMessageDialog(this, "Selecciona un archivo o carpeta para renombrar.", "Atencion", javax.swing.JOptionPane.WARNING_MESSAGE);
+            javax.swing.JOptionPane.showMessageDialog(this, "Selecciona un archivo o carpeta para renombrar.");
             return;
         }
-        
+    
         if (nodoSeleccionado.isRoot()) {
-            javax.swing.JOptionPane.showMessageDialog(this, "No puedes renombrar la raíz del disco.", "Accion denegada", javax.swing.JOptionPane.ERROR_MESSAGE);
+            javax.swing.JOptionPane.showMessageDialog(this, "¡No puedes renombrar el Disco Principal!", "Acción denegada", javax.swing.JOptionPane.ERROR_MESSAGE);
             return;
         }
-        
-        String nombreAntiguo = nodoSeleccionado.getUserObject().toString();
-        // Le quitamos el emoji para mostrar solo el texto limpio en el cuadro de diálogo
-        String textoLimpio = nombreAntiguo.substring(2).trim(); 
-        
-        String nuevoNombre = javax.swing.JOptionPane.showInputDialog(this, "Nuevo nombre:", textoLimpio);
-        
-        if (nuevoNombre != null && !nuevoNombre.trim().isEmpty()) {
-            
-            // --- NUEVO: CREAR EL PROCESO ---
-            Procesos.PCB nuevoProceso = new Procesos.PCB("Renombrar_" + textoLimpio, null);
-            nuevoProceso.setEstado(Procesos.Estado.LISTO);
-            Procesos.GestorProcesos.agregarProceso(nuevoProceso);
-            System.out.println("[Sistema] Solicitud de renombrado enviada.");
-
-            // --- ACTUALIZAR EL ÁRBOL (Visual/Temporal) ---
-            String emoji = nombreAntiguo.substring(0, 2);
-            nodoSeleccionado.setUserObject(emoji + " " + nuevoNombre);
-            
-            // Avisamos al modelo que el nodo cambió para que se actualice visualmente
-            ((javax.swing.tree.DefaultTreeModel) jTree1.getModel()).nodeChanged(nodoSeleccionado);
-            
-            System.out.println("Se renombró '" + textoLimpio + "' a '" + nuevoNombre + "'");
+    
+        String nombreAntiguoConEmoji = nodoSeleccionado.getUserObject().toString();
+    
+        // Detectamos si es carpeta o archivo por el emoji
+        boolean esCarpeta = nombreAntiguoConEmoji.startsWith("📁");
+        String emoji = esCarpeta ? "📁 " : "📄 ";
+        String nombreAntiguoLimpio = nombreAntiguoConEmoji.substring(2).trim();
+    
+        // 2. Pedir el nuevo nombre
+        String nombreNuevo = javax.swing.JOptionPane.showInputDialog(this, "Ingresa el nuevo nombre para '" + nombreAntiguoLimpio + "':", nombreAntiguoLimpio);
+    
+        if (nombreNuevo == null || nombreNuevo.trim().isEmpty() || nombreNuevo.trim().equals(nombreAntiguoLimpio)) {
+            return; // El usuario canceló, dejó en blanco o puso el mismo nombre
         }
+        String nombreNuevoLimpio = nombreNuevo.trim();
+
+        // Si es un archivo, debemos actualizar el mapa de colores y la tabla
+        if (!esCarpeta) {
+        
+            // 3. Actualizar el Mapa de Colores (CRÍTICO)
+            // Como la "llave" del diccionario era el nombre viejo, hay que sacarlo y meterlo con el nombre nuevo
+            synchronized(lockBloques) {
+                if (mapaColoresArchivos.containsKey(nombreAntiguoLimpio)) {
+                    java.awt.Color colorDelArchivo = mapaColoresArchivos.remove(nombreAntiguoLimpio);
+                    mapaColoresArchivos.put(nombreNuevoLimpio, colorDelArchivo);
+                }
+            }
+        
+            // 4. Actualizar la Tabla de Asignación Visual
+            javax.swing.table.DefaultTableModel modeloTabla = (javax.swing.table.DefaultTableModel) tablaAsignacion.getModel();
+            for (int i = 0; i < modeloTabla.getRowCount(); i++) {
+                if (modeloTabla.getValueAt(i, 0) != null && modeloTabla.getValueAt(i, 0).toString().equals(nombreAntiguoLimpio)) {
+                    // Cambiamos el valor de la columna 0 (Nombre)
+                    modeloTabla.setValueAt(nombreNuevoLimpio, i, 0);
+                    break;
+                }
+            }
+        }
+
+        // 5. Actualizar la Estructura Lógica en RAM (Directorio Global)
+        renombrarArchivoLogico(raizLogicaGlobal, nombreAntiguoLimpio, nombreNuevoLimpio);
+
+        // 6. Enviar la Solicitud al Gestor de Procesos
+        Procesos.PCB nuevoProceso = new Procesos.PCB("Renombrar_" + nombreAntiguoLimpio, null);
+        nuevoProceso.setEstado(Procesos.Estado.LISTO);
+        Procesos.GestorProcesos.agregarProceso(nuevoProceso);
+        System.out.println("[Sistema] Archivo/Carpeta renombrado de '" + nombreAntiguoLimpio + "' a '" + nombreNuevoLimpio + "'.");
+
+        // 7. Actualizar el Árbol Visual (JTree)
+        nodoSeleccionado.setUserObject(emoji + nombreNuevoLimpio);
+        javax.swing.tree.DefaultTreeModel modeloArbol = (javax.swing.tree.DefaultTreeModel) jTree1.getModel();
+        modeloArbol.nodeChanged(nodoSeleccionado);
     }//GEN-LAST:event_jButton4ActionPerformed
 
     private void jButton6ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton6ActionPerformed
         // TODO add your handling code here:
+        // Obtenemos el nodo seleccionado del JTree
         javax.swing.tree.DefaultMutableTreeNode nodoSeleccionado = (javax.swing.tree.DefaultMutableTreeNode) jTree1.getLastSelectedPathComponent();
-        
         if (nodoSeleccionado == null) {
             javax.swing.JOptionPane.showMessageDialog(this, "Selecciona el archivo o carpeta que deseas eliminar.");
             return;
         }
-        
         if (nodoSeleccionado.isRoot()) {
             javax.swing.JOptionPane.showMessageDialog(this, "¡No puedes eliminar el Disco Principal!", "Accion denegada", javax.swing.JOptionPane.ERROR_MESSAGE);
             return;
@@ -1023,32 +1159,77 @@ public class InterfazProyecto extends javax.swing.JFrame {
         int confirmacion = javax.swing.JOptionPane.showConfirmDialog(this, "¿Seguro que deseas eliminar '" + nombreNodo + "'?", "Confirmar", javax.swing.JOptionPane.YES_NO_OPTION);
         
         if (confirmacion == javax.swing.JOptionPane.YES_OPTION) {
-            
-            // --- NUEVO: CREAR EL PROCESO ---
-            // Limpiamos el nombre un poco para que no salga el emoji en el nombre del proceso
+            // Limpiamos el nombre (quitamos el emoji de carpeta o archivo)
             String nombreLimpio = nombreNodo.substring(2).trim();
-            Procesos.PCB nuevoProceso = new Procesos.PCB("Eliminar_" + nombreLimpio, null);
+            
+            // --- PASO 1: Buscar en la Tabla de Asignación y eliminar la fila ---
+            javax.swing.table.DefaultTableModel modeloTabla = (javax.swing.table.DefaultTableModel) tablaAsignacion.getModel();
+            int bloqueInicial = -1;
+            int tamanoBloques = 0;
+            
+            for (int i = 0; i < modeloTabla.getRowCount(); i++) {
+                // Buscamos el nombre del archivo en la primera columna (índice 0)
+                if (modeloTabla.getValueAt(i, 0) != null && modeloTabla.getValueAt(i, 0).toString().equals(nombreLimpio)) {
+                    // Obtenemos su posición y tamaño
+                    bloqueInicial = Integer.parseInt(modeloTabla.getValueAt(i, 1).toString());
+                    tamanoBloques = Integer.parseInt(modeloTabla.getValueAt(i, 2).toString());
+                    
+                    // Eliminamos la fila de la interfaz
+                    modeloTabla.removeRow(i);
+                    break; // Salimos del ciclo porque ya lo encontramos
+                }
+            }
+            
+            // --- PASO 2: Liberar el Disco (Protegido con el Lock) ---
+            if (bloqueInicial != -1) {
+                synchronized(lockBloques) {
+                    // Borramos el color de la memoria del archivo
+                    mapaColoresArchivos.remove(nombreLimpio);
+                    
+                    // Recorremos los bloques que ocupaba y los volvemos grises
+                    for (int i = 0; i < tamanoBloques; i++) {
+                        int posActual = bloqueInicial + i;
+                        
+                        if (posActual < coloresBloques.length) {
+                            // 1. Lo liberamos en la memoria de colores
+                            coloresBloques[posActual] = java.awt.Color.LIGHT_GRAY;
+                            
+                            // 2. Lo despintamos en la matriz visual
+                            // (Respetando el cabezal rojo por si el disco está parado ahí)
+                            if (posActual != cabezalAnterior && bloquesDisco[posActual] != null) {
+                                bloquesDisco[posActual].setBackground(java.awt.Color.LIGHT_GRAY);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // --- PASO 3: Mandar la solicitud al Gestor de Procesos ---
+            Procesos.PCB nuevoProceso = new Procesos.PCB("Eliminar_" + nombreLimpio, null); 
             nuevoProceso.setEstado(Procesos.Estado.LISTO);
             Procesos.GestorProcesos.agregarProceso(nuevoProceso);
-            System.out.println("[Sistema] Solicitud de eliminacion enviada.");
-
-            // --- ACTUALIZAR EL ARBOL (Visual/Temporal) ---
-            javax.swing.tree.DefaultTreeModel modelo = (javax.swing.tree.DefaultTreeModel) jTree1.getModel();
-            modelo.removeNodeFromParent(nodoSeleccionado);
+            System.out.println("[Sistema] Archivo '" + nombreLimpio + "' eliminado y bloques liberados.");
+            
+            // --- PASO 4: Actualizar el Árbol Visual (JTree) ---
+            javax.swing.tree.DefaultTreeModel modeloArbol = (javax.swing.tree.DefaultTreeModel) jTree1.getModel();
+            modeloArbol.removeNodeFromParent(nodoSeleccionado);
+            
+            // --- PASO 5: Eliminar de la estructura lógica de Java ---
+            // (Llamamos al método auxiliar para que se borre de la memoria RAM)
+            eliminarArchivoLogico(raizLogicaGlobal, nombreLimpio);
         }
     }//GEN-LAST:event_jButton6ActionPerformed
 
     private void jButton7ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton7ActionPerformed
         // TODO add your handling code here:
+        // 1. Conteo Lógico (Tu código original)
         javax.swing.tree.DefaultTreeModel modelo = (javax.swing.tree.DefaultTreeModel) jTree1.getModel();
         javax.swing.tree.DefaultMutableTreeNode raiz = (javax.swing.tree.DefaultMutableTreeNode) modelo.getRoot();
         
         int totalCarpetas = 0;
         int totalArchivos = 0;
         
-        // ¡Usamos 'var' como sugirió tu IDE!
         var enumeracion = raiz.breadthFirstEnumeration();
-        
         while (enumeracion.hasMoreElements()) {
             javax.swing.tree.DefaultMutableTreeNode nodo = (javax.swing.tree.DefaultMutableTreeNode) enumeracion.nextElement();
             String nombre = nodo.getUserObject().toString();
@@ -1060,15 +1241,46 @@ public class InterfazProyecto extends javax.swing.JFrame {
             }
         }
         
-        // ¡Usamos un 'Text Block' como sugirió tu IDE!
+        // 2. Conteo Físico del Disco (NUEVO)
+        int bloquesOcupados = 0;
+        int bloquesLibres = 0;
+        
+        synchronized(lockBloques) { // Bloqueamos un microsegundo para que la lectura sea exacta
+            for (int i = 0; i < coloresBloques.length; i++) {
+                if (coloresBloques[i] == null || coloresBloques[i].equals(java.awt.Color.LIGHT_GRAY)) {
+                    bloquesLibres++;
+                } else {
+                    bloquesOcupados++;
+                }
+            }
+        }
+        
+        // Calculamos porcentaje de uso
+        double porcentajeUso = ((double) bloquesOcupados / coloresBloques.length) * 100.0;
+        
+        // 3. Reporte Mejorado
         String reporte = """
-                         === ESTADISTICAS DEL DISCO ===
+                         === ESTADÍSTICAS DEL SISTEMA ===
+                         
+                         [ Estructura Lógica ]
                          Carpetas creadas: %d
                          Archivos creados: %d
-                         Total de elementos: %d""".formatted(totalCarpetas, totalArchivos, (totalCarpetas + totalArchivos));
+                         Total de elementos: %d
+                         
+                         [ Almacenamiento Físico ]
+                         Bloques Ocupados: %d
+                         Bloques Libres: %d
+                         Uso del Disco: %.1f%%""".formatted(
+                             totalCarpetas, 
+                             totalArchivos, 
+                             (totalCarpetas + totalArchivos),
+                             bloquesOcupados,
+                             bloquesLibres,
+                             porcentajeUso
+                         );
                          
         System.out.println(reporte);
-        javax.swing.JOptionPane.showMessageDialog(this, reporte, "Estadísticas", javax.swing.JOptionPane.INFORMATION_MESSAGE);
+        javax.swing.JOptionPane.showMessageDialog(this, reporte, "Estadísticas del Disco", javax.swing.JOptionPane.INFORMATION_MESSAGE);
     }//GEN-LAST:event_jButton7ActionPerformed
 
     private void jButton8ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton8ActionPerformed
@@ -1076,15 +1288,24 @@ public class InterfazProyecto extends javax.swing.JFrame {
         // Invertimos el estado actual
         sistemaPausado = !sistemaPausado;
         
-        // Como sabemos que el botón se llama jButton8, lo usamos directamente:
         if (sistemaPausado) {
             jButton8.setText("Reanudar");
             System.out.println("[Sistema] ⏸ SIMULACION PAUSADA.");
-            // TODO: Aquí luego llamaremos a un método para detener el reloj del procesador
+            
+            // Avisamos al Gestor de Procesos que congele la CPU
+            Procesos.GestorProcesos.pausarSimulacion();
+            
         } else {
             jButton8.setText("Pausa");
             System.out.println("[Sistema] ▶ SIMULACION REANUDADA.");
-            // TODO: Aquí luego llamaremos a un método para reanudar el reloj del procesador
+            
+            // 1. Avisamos al Gestor de Procesos que arranque la CPU
+            Procesos.GestorProcesos.reanudarSimulacion();
+            
+            // 2. Despertamos al Disco (si es que estaba dormido en el wait)
+            synchronized(lockPausa) {
+                lockPausa.notifyAll();
+            }
         }
     }//GEN-LAST:event_jButton8ActionPerformed
 
@@ -1378,6 +1599,203 @@ public class InterfazProyecto extends javax.swing.JFrame {
                 }
             }
         }).start();
+    }
+    
+    public void reiniciarPeticionesSimulacion() {
+        new Thread(() -> {
+            try {
+                System.out.println("=== RE-ENCOLANDO PETICIONES ===");
+                // Cargamos el JSON de la ruta actual
+                org.json.JSONObject jsonPrueba = Utilidades.GestorJSON.cargarPruebaSimulacion(this.rutaPruebaActual);
+                
+                if (jsonPrueba == null) return;
+                
+                if (!jsonPrueba.has("requests")) {
+                    String aviso = "Aviso: El JSON actual no contiene pruebas de simulación ('requests'). El disco no se moverá.";
+                    System.out.println(aviso);
+                    // jTextAreaLog.append(aviso + "\n");
+                    return; // Salimos del método sin romper el programa
+                }
+                
+                org.json.JSONArray requests = jsonPrueba.getJSONArray("requests");
+                
+                // Obtenemos la cola existente de tu disco simulado
+                estructuras.Cola<Procesos.SolicitudIO> colaIO = discoSimulado.getColaCompartida();
+                
+                // Encolar las peticiones nuevamente
+                for (int i = 0; i < requests.length(); i++) {
+                    org.json.JSONObject req = requests.getJSONObject(i);
+                    int posicion = req.getInt("pos");
+                    String operacionStr = req.getString("op").toUpperCase();
+                    
+                    Procesos.TipoOperacionIO tipoOp;
+                    switch (operacionStr) {
+                        case "READ": tipoOp = Procesos.TipoOperacionIO.LEER; break;
+                        case "UPDATE": tipoOp = Procesos.TipoOperacionIO.ACTUALIZAR; break;
+                        default: tipoOp = Procesos.TipoOperacionIO.ELIMINAR; break;
+                    }
+                    
+                    // Mapeo seguro visual
+                    int posVisual = posicion >= bloquesDisco.length ? (posicion % bloquesDisco.length) : posicion;
+                    Procesos.SolicitudIO nuevaSolicitud = new Procesos.SolicitudIO(i, tipoOp, "archivo", 1, posVisual);
+                    
+                    // Metemos la solicitud a la cola compartida
+                    colaIO.encolar(nuevaSolicitud);
+                }
+                
+                // ¡Despertamos al disco enviando los semáforos correspondientes!
+                for (int i = 0; i < requests.length(); i++) {
+                    discoSimulado.registrarNuevaPeticion();
+                }
+            }catch (org.json.JSONException e) {
+                // Atrapamos errores específicos de formato JSON
+                String errorMsg = "Error al leer el formato JSON: " + e.getMessage();
+                System.err.println(errorMsg);
+                // Ejemplo: jTextAreaLog.append(errorMsg + "\n");
+            } catch (Exception e) {
+                // Un catch genérico por si falla otra cosa inesperada
+                String errorMsg = "Error inesperado en simulación: " + e.getMessage();
+                // Ejemplo: jTextAreaLog.append(errorMsg + "\n");
+            }
+        }).start();
+    }
+    
+    /**
+     * Busca un archivo o directorio por su nombre dentro del árbol lógico y lo elimina.
+     */
+    private boolean eliminarArchivoLogico(Archivo.Directorio directorioPadre, String nombreBuscado) {
+        if (directorioPadre == null || directorioPadre.getContenido() == null) return false;
+        
+        // Recorremos el contenido del directorio
+        for (int i = 0; i < directorioPadre.getContenido().getTamano(); i++) {
+            Archivo.EntradaSistemaArchivos entrada = directorioPadre.getContenido().get(i);
+            // Si encontramos el archivo/carpeta, lo removemos de la lista
+            if (entrada.getNombre().equals(nombreBuscado)) {
+                directorioPadre.getContenido().eliminar(entrada);
+                return true;
+            }
+            
+            // Si es una subcarpeta, entramos a buscar recursivamente
+            if (entrada instanceof Archivo.Directorio) {
+                boolean eliminado = eliminarArchivoLogico((Archivo.Directorio) entrada, nombreBuscado);
+                if (eliminado) return true; // Si lo encontró y borró adentro, terminamos
+            }
+        }
+        return false;
+    }
+    
+    /**
+    * Busca N bloques vacíos de forma consecutiva en el disco.
+    * @param tamaño Requerimiento de bloques del nuevo archivo.
+    * @return El índice de inicio si encuentra espacio, o -1 si no hay espacio.
+    */
+    private int buscarEspacioLibreContiguo(int tamaño) {
+        int contadorLibres = 0;
+    
+        for (int i = 0; i < coloresBloques.length; i++) {
+            // Un bloque está libre si su color es nulo o gris claro
+            if (coloresBloques[i] == null || coloresBloques[i].equals(java.awt.Color.LIGHT_GRAY)) {
+                contadorLibres++;
+            
+                // Si ya encontramos la cantidad de bloques seguidos que necesitamos
+                if (contadorLibres == tamaño) {
+                    return (i - tamaño) + 1; // Devolvemos el índice donde empieza el hueco
+                }
+            } else {
+                // Si chocamos con un bloque ocupado, reiniciamos el contador a 0
+                contadorLibres = 0;
+            }
+        }
+        return -1; // Retorna -1 si recorrió todo el disco y no encontró un hueco suficientemente grande
+    }
+
+    /**
+    * Busca recursivamente el directorio padre y añade el nuevo objeto Archivo.Archivo en él.
+    */
+    private boolean agregarArchivoLogico(Archivo.Directorio directorioActual, String nombrePadreBuscado, Archivo.EntradaSistemaArchivos nuevoArchivo) {
+        if (directorioActual == null) return false;
+
+        // Si encontramos el directorio destino
+        if (directorioActual.getNombre().equals(nombrePadreBuscado)) {
+            // Usamos el método de tu ListaEnlazada para agregar
+            directorioActual.getContenido().agregar(nuevoArchivo); 
+            return true;
+        }
+    
+        // Si no es el directorio, buscamos profundamente en las subcarpetas
+        for (int i = 0; i < directorioActual.getContenido().getTamano(); i++) {
+            Archivo.EntradaSistemaArchivos entrada = directorioActual.getContenido().get(i);
+        
+            if (entrada instanceof Archivo.Directorio) {
+                boolean agregado = agregarArchivoLogico((Archivo.Directorio) entrada, nombrePadreBuscado, nuevoArchivo);
+                if (agregado) return true;
+            }
+        }
+    
+        return false;
+    }
+    
+    /**
+    * Método que el Planificador llama para intentar procesar un bloque.
+    * Maneja su propia sincronización de forma transparente usando el lock global.
+    */
+    public boolean ejecutarPeticionEnDiscoSegura(Procesos.SolicitudIO peticion) {
+        synchronized (lockBloques) {
+            int bloqueObj = peticion.getBloqueObjetivo();
+            int posSegura = bloqueObj >= bloquesDisco.length ? (bloqueObj % bloquesDisco.length) : bloqueObj;
+
+            // Validamos el estado del bloque (si no es gris y no es nulo, es válido)
+            boolean bloqueValido = coloresBloques[posSegura] != null && coloresBloques[posSegura] != java.awt.Color.LIGHT_GRAY;
+
+            if (bloqueValido) {
+                // Aquí movemos el cabezal rojo de manera segura
+                actualizarCabezalVisual(posSegura);
+                return true; // La operación procede
+            } else {
+                return false; // El bloque estaba vacío o el archivo fue borrado
+            }
+        }
+    }
+    
+    /**
+    * Busca un archivo o directorio por su nombre antiguo en el árbol lógico y lo actualiza al nuevo.
+    */
+    private boolean renombrarArchivoLogico(Archivo.Directorio directorioPadre, String nombreAntiguo, String nombreNuevo) {
+        if (directorioPadre == null || directorioPadre.getContenido() == null) return false;
+    
+        // Recorremos el contenido de este directorio
+        for (int i = 0; i < directorioPadre.getContenido().getTamano(); i++) {
+            Archivo.EntradaSistemaArchivos entrada = directorioPadre.getContenido().get(i);
+        
+            // Si encontramos el que buscamos, le cambiamos el nombre
+            if (entrada.getNombre().equals(nombreAntiguo)) {
+                entrada.setNombre(nombreNuevo);
+                return true; // Terminamos la búsqueda con éxito
+            }
+        
+            // Si es una subcarpeta, buscamos dentro de ella recursivamente
+            if (entrada instanceof Archivo.Directorio) {
+                boolean renombrado = renombrarArchivoLogico((Archivo.Directorio) entrada, nombreAntiguo, nombreNuevo);
+                if (renombrado) return true;
+            }
+        }
+        return false;
+    }
+    
+    /**
+    * Pone a dormir al hilo que lo llame si el sistema está pausado.
+    */
+    public void verificarPausa() {
+        synchronized (lockPausa) {
+            while (sistemaPausado) {
+                try {
+                    // Aquí el hilo se duerme sin consumir nada de CPU (0%)
+                    lockPausa.wait(); 
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }
     }
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
