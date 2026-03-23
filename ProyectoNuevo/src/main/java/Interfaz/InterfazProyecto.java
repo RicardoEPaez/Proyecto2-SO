@@ -9,7 +9,7 @@ package Interfaz;
  * @author ricar
  */
 public class InterfazProyecto extends javax.swing.JFrame {
-    private javax.swing.JPanel[] bloquesDisco = new javax.swing.JPanel[200];
+    private javax.swing.JPanel[] bloquesDisco = new javax.swing.JPanel[250];
     private Modo modoActual = Modo.ADMINISTRADOR;
     private boolean sistemaPausado = false;
     private int cabezalAnterior = 0;
