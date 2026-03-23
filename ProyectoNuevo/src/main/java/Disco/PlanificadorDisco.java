@@ -81,6 +81,12 @@ public class PlanificadorDisco implements Runnable {
                     
                     // 2. Comprobamos si el bloque seguía existiendo
                     if (operacionExitosa) {
+                        
+                        if (this.interfazGrafica != null) {
+                            String nombreArchivo = seleccionada.getRuta(); 
+                            this.interfazGrafica.procesarPeticionCache(destino, nombreArchivo);
+                        }
+
                         // SÍ ERA UN BLOQUE VÁLIDO: Registramos y hacemos el movimiento
                         Journaling.GestorJournaling.registrarOperacion(new Journaling.RegistroJournal(
                             seleccionada.getTipo().toString(), 

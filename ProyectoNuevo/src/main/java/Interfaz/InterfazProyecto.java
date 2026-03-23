@@ -22,6 +22,36 @@ public class InterfazProyecto extends javax.swing.JFrame {
     private boolean simulacionIniciada = false;
     private final Object lockBloques = new Object();
     public final Object lockPausa = new Object();
+    
+    private final int MAX_CACHE = 10;
+    private int cacheHits = 0;
+    private int cacheMisses = 0;
+    
+    // Nuestro objeto para guardar la info del bloque
+    class RegistroCache {
+        int bloque;
+        String nombreArchivo;
+        
+        public RegistroCache(int b, String n) { 
+            this.bloque = b; 
+            this.nombreArchivo = n; 
+        }
+        
+        // ¡Súper importante! Le decimos a Java cómo comparar dos registros.
+        // Esto permite que el método eliminar() de tu ListaEnlazada encuentre el objeto correcto.
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) return true;
+            if (obj == null || getClass() != obj.getClass()) return false;
+            RegistroCache otro = (RegistroCache) obj;
+            return this.bloque == otro.bloque && this.nombreArchivo.equals(otro.nombreArchivo);
+        }
+    }
+    
+    // Instanciamos tu lista enlazada
+    private estructuras.ListaEnlazada<RegistroCache> bufferCache = new estructuras.ListaEnlazada<>();
+    
+    
     /**
      * Creates new form InterfazProyecto
      */
@@ -203,6 +233,19 @@ public class InterfazProyecto extends javax.swing.JFrame {
                 int posicion = req.getInt("pos");
                 String operacionStr = req.getString("op").toUpperCase(); 
                 
+                // --- NUEVO: BUSCAR EL NOMBRE REAL Y CANTIDAD DE BLOQUES ---
+                String nombreReal = "Desconocido";
+                int cantidadBloques = 1; // 1 por defecto por si no lo encuentra
+                String keyPos = String.valueOf(posicion);
+                
+                // Buscamos en el diccionario de archivos usando la posición
+                if (systemFiles.has(keyPos)) {
+                    org.json.JSONObject fileData = systemFiles.getJSONObject(keyPos);
+                    nombreReal = fileData.getString("name");
+                    cantidadBloques = fileData.getInt("blocks"); // Sacamos cuántos bloques ocupa
+                }
+                
+                
                 // --- TRADUCTOR DE INGLÉS A ESPAÑOL ---
                 Procesos.TipoOperacionIO tipoOp;
                 switch (operacionStr) {
@@ -225,7 +268,7 @@ public class InterfazProyecto extends javax.swing.JFrame {
                 // --------------------------------------------
                 
                 // Usamos valores ficticios (1, "Simulacion", 1) para las variables que no importan en la prueba
-                Procesos.SolicitudIO nuevaSolicitud = new Procesos.SolicitudIO(1, tipoOp, "Simulacion", 1, posicion);
+                Procesos.SolicitudIO nuevaSolicitud = new Procesos.SolicitudIO(1, tipoOp, nombreReal, 1, posicion);
                 
                 // Lo metemos a la cola
                 discoSimulado.getColaCompartida().encolar(nuevaSolicitud); 
@@ -349,6 +392,59 @@ public class InterfazProyecto extends javax.swing.JFrame {
             }
         }
     }
+    
+    public void procesarPeticionCache(int bloqueBuscado, String nombreArchivo) {
+        boolean encontrado = false;
+        
+        // 1. Buscamos en tu lista recorriéndola por índice
+        for (int i = 0; i < bufferCache.getTamano(); i++) {
+            RegistroCache reg = bufferCache.get(i); 
+            if (reg.bloque == bloqueBuscado) {
+                encontrado = true;
+                break;
+            }
+        }
+        
+        // 2. Evaluamos Hit o Miss
+        if (encontrado) {
+            cacheHits++; // Hit: el bloque ya estaba en memoria
+        } else {
+            cacheMisses++; // Miss: el bloque no estaba
+            
+            // FIFO: Si la lista está llena (10), borramos el más viejo (el del índice 0)
+            if (bufferCache.getTamano() >= MAX_CACHE) {
+                RegistroCache masViejo = bufferCache.get(0);
+                bufferCache.eliminar(masViejo); // Tu método eliminar() lo sacará del frente
+            }
+            
+            // Metemos el bloque nuevo al final de la cola
+            bufferCache.agregar(new RegistroCache(bloqueBuscado, nombreArchivo));
+        }
+        
+        // 3. Refrescamos la UI
+        actualizarPantallaCache();
+    }
+
+    private void actualizarPantallaCache() {
+        StringBuilder sb = new StringBuilder();
+        
+        // Recorremos tu lista para imprimir el texto como en la imagen del profesor
+        for (int i = 0; i < bufferCache.getTamano(); i++) {
+            RegistroCache reg = bufferCache.get(i);
+            sb.append("Bloque ").append(reg.bloque).append(" (").append(reg.nombreArchivo).append(")\n");
+        }
+        
+        // Asumiendo que tu JTextArea se llama txtAreaCache y tu JLabel lblEstadisticasCache
+        txtAreaCache.setText(sb.toString()); 
+        
+        int total = cacheHits + cacheMisses;
+        double tasa = (total == 0) ? 0.0 : ((double) cacheHits / total) * 100.0;
+        
+        String textoStats = String.format("Hits: %d | Misses: %d | Total: %d | Tasa: %.1f%%", 
+                                          cacheHits, cacheMisses, total, tasa);
+        
+        lblEstadisticasCache.setText(textoStats); 
+    }
 
     /**
      * This method is called from within the constructor to initialize the form.
@@ -395,6 +491,9 @@ public class InterfazProyecto extends javax.swing.JFrame {
         jScrollPane4 = new javax.swing.JScrollPane();
         tablaAsignacion = new javax.swing.JTable();
         jPanel10 = new javax.swing.JPanel();
+        jScrollPane5 = new javax.swing.JScrollPane();
+        txtAreaCache = new javax.swing.JTextArea();
+        lblEstadisticasCache = new javax.swing.JLabel();
         jMenuBar1 = new javax.swing.JMenuBar();
         jMenu1 = new javax.swing.JMenu();
         jMenuItem1 = new javax.swing.JMenuItem();
@@ -716,15 +815,29 @@ public class InterfazProyecto extends javax.swing.JFrame {
 
         jTabbedPane1.addTab("Tabla de Asignacion", jPanel9);
 
+        txtAreaCache.setColumns(20);
+        txtAreaCache.setRows(5);
+        jScrollPane5.setViewportView(txtAreaCache);
+
         javax.swing.GroupLayout jPanel10Layout = new javax.swing.GroupLayout(jPanel10);
         jPanel10.setLayout(jPanel10Layout);
         jPanel10Layout.setHorizontalGroup(
             jPanel10Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 672, Short.MAX_VALUE)
+            .addGroup(jPanel10Layout.createSequentialGroup()
+                .addGap(20, 20, 20)
+                .addGroup(jPanel10Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(lblEstadisticasCache, javax.swing.GroupLayout.PREFERRED_SIZE, 634, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(jScrollPane5, javax.swing.GroupLayout.PREFERRED_SIZE, 634, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addContainerGap(18, Short.MAX_VALUE))
         );
         jPanel10Layout.setVerticalGroup(
             jPanel10Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 355, Short.MAX_VALUE)
+            .addGroup(jPanel10Layout.createSequentialGroup()
+                .addGap(18, 18, 18)
+                .addComponent(jScrollPane5, javax.swing.GroupLayout.PREFERRED_SIZE, 149, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(18, 18, 18)
+                .addComponent(lblEstadisticasCache, javax.swing.GroupLayout.PREFERRED_SIZE, 113, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(57, Short.MAX_VALUE))
         );
 
         jTabbedPane1.addTab("Cache", jPanel10);
@@ -1836,12 +1949,15 @@ public class InterfazProyecto extends javax.swing.JFrame {
     private javax.swing.JScrollPane jScrollPane2;
     private javax.swing.JScrollPane jScrollPane3;
     private javax.swing.JScrollPane jScrollPane4;
+    private javax.swing.JScrollPane jScrollPane5;
     private javax.swing.JSlider jSlider1;
     private javax.swing.JTabbedPane jTabbedPane1;
     private javax.swing.JTextArea jTextArea1;
     private javax.swing.JTextArea jTextArea2;
     private javax.swing.JTree jTree1;
+    private javax.swing.JLabel lblEstadisticasCache;
     private javax.swing.JPanel panelDiscoSimulador;
     private javax.swing.JTable tablaAsignacion;
+    private javax.swing.JTextArea txtAreaCache;
     // End of variables declaration//GEN-END:variables
 }
