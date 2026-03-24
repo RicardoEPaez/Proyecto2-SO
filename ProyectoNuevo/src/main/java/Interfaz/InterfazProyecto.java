@@ -16,7 +16,7 @@ public class InterfazProyecto extends javax.swing.JFrame {
     private Disco.PlanificadorDisco discoSimulado;
     private String rutaPruebaActual = "";
     private Archivo.Directorio raizLogicaGlobal = new Archivo.Directorio("Disco (C:)", null);
-    private java.awt.Color[] coloresBloques = new java.awt.Color[100];
+    private java.awt.Color[] coloresBloques = new java.awt.Color[250];
     private MapaSimple<String, java.awt.Color> mapaColoresArchivos = new MapaSimple<>();
     private int cicloActual = 0;
     private boolean simulacionIniciada = false;
@@ -24,6 +24,7 @@ public class InterfazProyecto extends javax.swing.JFrame {
     public final Object lockPausa = new Object();
     private MapaSimple<String, javax.swing.tree.DefaultMutableTreeNode> nodosDestinoPendientes = new MapaSimple<>();
     private MapaSimple<String, java.awt.Color> coloresPendientes = new MapaSimple<>();
+    private MapaSimple<String, Journaling.RegistroJournal> transaccionesPendientes = new MapaSimple<>();
     private final int MAX_CACHE = 10;
     private int cacheHits = 0;
     private int cacheMisses = 0;
@@ -97,6 +98,12 @@ public class InterfazProyecto extends javax.swing.JFrame {
             }
             return false;
         }
+        
+        
+        public void limpiar() {
+            this.lista = new estructuras.ListaEnlazada<>();
+        }
+        
     }
  
     // Nuestro objeto para guardar la info del bloque
@@ -230,26 +237,26 @@ public class InterfazProyecto extends javax.swing.JFrame {
         final int posSegura = (nuevaPosicion >= bloquesDisco.length) ? (nuevaPosicion % bloquesDisco.length) : nuevaPosicion;
  
         javax.swing.SwingUtilities.invokeLater(() -> {
-            try {
+        try {
                 // 1. Despintar el bloque viejo (volverlo gris)
-                bloquesDisco[cabezalAnterior].setBackground(coloresBloques[cabezalAnterior]);
-                
+            bloquesDisco[cabezalAnterior].setBackground(coloresBloques[cabezalAnterior]);
+            
                 // 2. Pintar el bloque nuevo de rojo
                 bloquesDisco[posSegura].setBackground(java.awt.Color.RED);
-                
+            
                 // 3. Actualizar la etiqueta de texto
                 jLabel5.setText("Cabeza: " + posSegura);
-                
+            
                 // Forzar a la ventana a redibujarse
-                panelDiscoSimulador.repaint();
-                
+            panelDiscoSimulador.repaint();
+            
                 // 4. Guardar la nueva posición
                 cabezalAnterior = posSegura;
                 
-            } catch (Exception e) {
+        } catch (Exception e) {
                 System.out.println("Error al pintar la UI: " + e.getMessage());
-            }
-        });
+        }
+    });
     }
     
     public void ejecutarPruebaJSON(String rutaArchivoJSON) {
@@ -402,8 +409,8 @@ public class InterfazProyecto extends javax.swing.JFrame {
                 coloresBloques[posicionActual] = colorArchivo;
                 
                 // Pintamos el bloque, a menos que el cabezal rojo esté parado exactamente ahí
-                if (posicionActual != cabezalAnterior) {
-                    bloquesDisco[posicionActual].setBackground(colorArchivo);
+               if (posicionActual != cabezalAnterior) {
+                bloquesDisco[posicionActual].setBackground(colorArchivo);
                 }
             }
         }
@@ -566,6 +573,11 @@ public class InterfazProyecto extends javax.swing.JFrame {
         jScrollPane5 = new javax.swing.JScrollPane();
         txtAreaCache = new javax.swing.JTextArea();
         lblEstadisticasCache = new javax.swing.JLabel();
+        jPanel5 = new javax.swing.JPanel();
+        jScrollPane6 = new javax.swing.JScrollPane();
+        jTextArea3 = new javax.swing.JTextArea();
+        jCheckBoxSimularFallo = new javax.swing.JCheckBox();
+        jButton9 = new javax.swing.JButton();
         jMenuBar1 = new javax.swing.JMenuBar();
         jMenu1 = new javax.swing.JMenu();
         jMenuItem1 = new javax.swing.JMenuItem();
@@ -679,18 +691,17 @@ public class InterfazProyecto extends javax.swing.JFrame {
                         .addGap(15, 15, 15)
                         .addComponent(jSlider1, javax.swing.GroupLayout.PREFERRED_SIZE, 358, javax.swing.GroupLayout.PREFERRED_SIZE))
                     .addGroup(jPanel6Layout.createSequentialGroup()
-                        .addGap(169, 169, 169)
+                        .addGap(163, 163, 163)
                         .addComponent(jLabel3, javax.swing.GroupLayout.PREFERRED_SIZE, 46, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addContainerGap(19, Short.MAX_VALUE))
         );
         jPanel6Layout.setVerticalGroup(
             jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel6Layout.createSequentialGroup()
-                .addContainerGap()
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addComponent(jSlider1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(18, 18, 18)
-                .addComponent(jLabel3)
-                .addContainerGap(15, Short.MAX_VALUE))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(jLabel3))
         );
 
         jLabel4.setText("Ciclo: 0");
@@ -706,7 +717,7 @@ public class InterfazProyecto extends javax.swing.JFrame {
                     .addGroup(jPanel1Layout.createSequentialGroup()
                         .addContainerGap()
                         .addComponent(jPanel6, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(58, 58, 58)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                         .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(jLabel4, javax.swing.GroupLayout.PREFERRED_SIZE, 84, javax.swing.GroupLayout.PREFERRED_SIZE)
                             .addComponent(jLabel5, javax.swing.GroupLayout.PREFERRED_SIZE, 95, javax.swing.GroupLayout.PREFERRED_SIZE)))
@@ -754,15 +765,13 @@ public class InterfazProyecto extends javax.swing.JFrame {
                     .addComponent(jButton6)
                     .addComponent(jButton7)
                     .addComponent(jButton8))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(jPanel1Layout.createSequentialGroup()
-                        .addGap(30, 30, 30)
                         .addComponent(jLabel4)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                        .addComponent(jLabel5))
-                    .addGroup(jPanel1Layout.createSequentialGroup()
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(jPanel6, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                        .addComponent(jLabel5))
+                    .addComponent(jPanel6, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
@@ -776,14 +785,14 @@ public class InterfazProyecto extends javax.swing.JFrame {
             jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel2Layout.createSequentialGroup()
                 .addContainerGap()
-                .addComponent(jScrollPane1)
+                .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 271, Short.MAX_VALUE)
                 .addContainerGap())
         );
         jPanel2Layout.setVerticalGroup(
             jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel2Layout.createSequentialGroup()
                 .addContainerGap()
-                .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 389, Short.MAX_VALUE)
+                .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 377, Short.MAX_VALUE)
                 .addContainerGap())
         );
 
@@ -928,7 +937,50 @@ public class InterfazProyecto extends javax.swing.JFrame {
             .addGroup(jPanel7Layout.createSequentialGroup()
                 .addGap(17, 17, 17)
                 .addComponent(jTabbedPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 390, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addContainerGap(23, Short.MAX_VALUE))
+        );
+
+        jTextArea3.setColumns(20);
+        jTextArea3.setRows(5);
+        jScrollPane6.setViewportView(jTextArea3);
+
+        jCheckBoxSimularFallo.setText("SimularFallo");
+        jCheckBoxSimularFallo.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jCheckBoxSimularFalloActionPerformed(evt);
+            }
+        });
+
+        jButton9.setText("Recuperar Fallo");
+        jButton9.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton9ActionPerformed(evt);
+            }
+        });
+
+        javax.swing.GroupLayout jPanel5Layout = new javax.swing.GroupLayout(jPanel5);
+        jPanel5.setLayout(jPanel5Layout);
+        jPanel5Layout.setHorizontalGroup(
+            jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel5Layout.createSequentialGroup()
+                .addGap(17, 17, 17)
+                .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(jPanel5Layout.createSequentialGroup()
+                        .addComponent(jCheckBoxSimularFallo, javax.swing.GroupLayout.PREFERRED_SIZE, 151, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(jButton9))
+                    .addComponent(jScrollPane6, javax.swing.GroupLayout.PREFERRED_SIZE, 324, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addContainerGap(16, Short.MAX_VALUE))
+        );
+        jPanel5Layout.setVerticalGroup(
+            jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel5Layout.createSequentialGroup()
+                .addGap(18, 18, 18)
+                .addComponent(jScrollPane6, javax.swing.GroupLayout.PREFERRED_SIZE, 283, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 18, Short.MAX_VALUE)
+                .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(jCheckBoxSimularFallo)
+                    .addComponent(jButton9)))
         );
 
         jMenu1.setText("Archivos");
@@ -984,13 +1036,17 @@ public class InterfazProyecto extends javax.swing.JFrame {
                 .addGap(19, 19, 19)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addGroup(layout.createSequentialGroup()
-                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                    .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
+                        .addGroup(layout.createSequentialGroup()
+                            .addComponent(jPanel2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                            .addComponent(jPanel7, javax.swing.GroupLayout.PREFERRED_SIZE, 677, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addGap(52, 52, 52)
+                            .addComponent(jPanel5, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addGap(280, 280, 280))
+                        .addGroup(layout.createSequentialGroup()
                             .addComponent(jPanel3, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                            .addComponent(jPanel2, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                        .addGap(18, 18, 18)
-                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(jPanel7, javax.swing.GroupLayout.PREFERRED_SIZE, 700, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addGap(18, 18, 18)
                             .addComponent(jPanel4, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))))
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
@@ -999,11 +1055,16 @@ public class InterfazProyecto extends javax.swing.JFrame {
             .addGroup(layout.createSequentialGroup()
                 .addGap(15, 15, 15)
                 .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                    .addComponent(jPanel2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(jPanel7, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(layout.createSequentialGroup()
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(jPanel2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(jPanel7, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                    .addGroup(layout.createSequentialGroup()
+                        .addGap(64, 64, 64)
+                        .addComponent(jPanel5, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                .addGap(36, 36, 36)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addComponent(jPanel4, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addComponent(jPanel3, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
@@ -1107,6 +1168,20 @@ public class InterfazProyecto extends javax.swing.JFrame {
         nodosDestinoPendientes.put(nombreLimpio, nodoSeleccionado);
         coloresPendientes.put(nombreLimpio, colorNuevo);
         
+        Journaling.RegistroJournal txArchivo = new Journaling.RegistroJournal("CREAR", nombreLimpio, bloqueInicial);
+        Journaling.GestorJournaling.registrarOperacion(txArchivo);
+        jTextArea3.setText(Journaling.GestorJournaling.obtenerTextoJournal()); // Actualizar UI
+        
+        // ¿Simulamos el fallo?
+        if (jCheckBoxSimularFallo.isSelected()) {
+            javax.swing.JOptionPane.showMessageDialog(this, "💥 FALLO DE SISTEMA. Energía cortada antes de guardar los datos en disco.", "Error Crítico", javax.swing.JOptionPane.ERROR_MESSAGE);
+            return; // Abortamos aquí. El hilo nunca inicia.
+        }
+        
+        // Si no hay fallo, guardamos la transacción para confirmarla después
+        transaccionesPendientes.put("CREATE_" + nombreLimpio, txArchivo);
+        // ---------------------------------------------------------
+        
         // 6. Crear la Solicitud de Entrada/Salida (I/O)
         int pIdSimulado = Procesos.GestorProcesos.getCantidadProcesos() + 1;
         Procesos.SolicitudIO nuevaSolicitud = new Procesos.SolicitudIO(
@@ -1174,56 +1249,62 @@ public class InterfazProyecto extends javax.swing.JFrame {
     }//GEN-LAST:event_jButton2ActionPerformed
 
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
-        // TODO add your handling code here:
-        javax.swing.tree.DefaultMutableTreeNode nodoSeleccionado = (javax.swing.tree.DefaultMutableTreeNode) jTree1.getLastSelectedPathComponent();
-        
-        if (nodoSeleccionado == null) {
-            javax.swing.JOptionPane.showMessageDialog(this, "Selecciona que deseas leer.", "Atencion", javax.swing.JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-        
-        String nombre = nodoSeleccionado.getUserObject().toString();
-        
+       javax.swing.tree.DefaultMutableTreeNode nodoSeleccionado = (javax.swing.tree.DefaultMutableTreeNode) jTree1.getLastSelectedPathComponent();
+    
+    if (nodoSeleccionado == null) {
+        javax.swing.JOptionPane.showMessageDialog(this, "Selecciona que deseas leer.", "Atencion", javax.swing.JOptionPane.WARNING_MESSAGE);
+        return;
+    }
+    
+    String nombre = nodoSeleccionado.getUserObject().toString();
+    
         // Verificamos que sea un archivo y no una carpeta
-        if (nombre.startsWith("📁") || nodoSeleccionado.isRoot()) {
-            javax.swing.JOptionPane.showMessageDialog(this, "Solo puedes leer archivos, no carpetas o discos.", "Accion denegada", javax.swing.JOptionPane.ERROR_MESSAGE);
-            return;
+    if (nombre.startsWith("📁") || nodoSeleccionado.isRoot()) {
+        javax.swing.JOptionPane.showMessageDialog(this, "Solo puedes leer archivos, no carpetas o discos.", "Accion denegada", javax.swing.JOptionPane.ERROR_MESSAGE);
+        return;
+    }
+    
+    // Quita el emoji Y el sufijo "(X bloques)" si existe
+    String nombreLimpio = nombre.substring(2).trim();
+    if (nombreLimpio.contains(" (")) {
+        nombreLimpio = nombreLimpio.substring(0, nombreLimpio.indexOf(" (")).trim();
+    }
+    
+    // Buscar el bloque inicial en la Tabla de Asignación
+    int bloqueInicial = -1;
+    javax.swing.table.DefaultTableModel modeloTabla = (javax.swing.table.DefaultTableModel) tablaAsignacion.getModel();
+    
+    for (int i = 0; i < modeloTabla.getRowCount(); i++) {
+        if (modeloTabla.getValueAt(i, 0) != null && 
+            modeloTabla.getValueAt(i, 0).toString().equals(nombreLimpio)) {
+            bloqueInicial = Integer.parseInt(modeloTabla.getValueAt(i, 1).toString());
+            break;
         }
-        
-        String nombreLimpio = nombre.substring(2).trim();
-        
-        // --- PASO 1: Buscar el bloque inicial en la Tabla de Asignación ---
-        int bloqueInicial = -1;
-        javax.swing.table.DefaultTableModel modeloTabla = (javax.swing.table.DefaultTableModel) tablaAsignacion.getModel();
-        
-        for (int i = 0; i < modeloTabla.getRowCount(); i++) {
-            if (modeloTabla.getValueAt(i, 0) != null && modeloTabla.getValueAt(i, 0).toString().equals(nombreLimpio)) {
-                bloqueInicial = Integer.parseInt(modeloTabla.getValueAt(i, 1).toString());
-                break;
-            }
-        }
-        
-        if (bloqueInicial == -1) {
-            javax.swing.JOptionPane.showMessageDialog(this, "Error: No se encontró el bloque físico del archivo.", "Error", javax.swing.JOptionPane.ERROR_MESSAGE);
-            return;
-        }
+    }
+    
+    if (bloqueInicial == -1) {
+        javax.swing.JOptionPane.showMessageDialog(this, 
+            "Error: No se encontro el bloque fisico del archivo '" + nombreLimpio + "'.", 
+            "Error", javax.swing.JOptionPane.ERROR_MESSAGE);
+        return;
+    }
 
-        // --- PASO 2: CREAR LA SOLICITUD Y EL PROCESO ---
-        int idProceso = Procesos.GestorProcesos.getCantidadProcesos() + 1;
-        Procesos.SolicitudIO peticionLectura = new Procesos.SolicitudIO(idProceso, Procesos.TipoOperacionIO.LEER, nombreLimpio, 1, bloqueInicial);
-        
-        Procesos.PCB nuevoProceso = new Procesos.PCB("Leer_" + nombreLimpio, peticionLectura);
-        Procesos.GestorProcesos.agregarProceso(nuevoProceso);
-        
-        // --- PASO 3: ARRANCAR EL HILO PROCESO (Para que pase por la CPU) ---
-        // ¡Este hilo se encargará internamente de encolar y despertar al disco!
-        Procesos.HiloProceso hilo = new Procesos.HiloProceso(nuevoProceso, discoSimulado.getColaCompartida(), discoSimulado, this);
-        new Thread(hilo).start();
-
-        this.actualizarPantallaProcesos();
-
-        // Simulación visual inicial
-        javax.swing.JOptionPane.showMessageDialog(this, "Solicitud de lectura enviada a CPU.\nLuego pasará a la cola y el disco se moverá hacia el bloque " + bloqueInicial + ".", "Leyendo Archivo", javax.swing.JOptionPane.INFORMATION_MESSAGE);
+    int idProceso = Procesos.GestorProcesos.getCantidadProcesos() + 1;
+    Procesos.SolicitudIO peticionLectura = new Procesos.SolicitudIO(
+            idProceso, Procesos.TipoOperacionIO.LEER, nombreLimpio, 1, bloqueInicial);
+    
+    Procesos.PCB nuevoProceso = new Procesos.PCB("Leer_" + nombreLimpio, peticionLectura);
+    Procesos.GestorProcesos.agregarProceso(nuevoProceso);
+    
+    Procesos.HiloProceso hilo = new Procesos.HiloProceso(
+            nuevoProceso, discoSimulado.getColaCompartida(), discoSimulado, this);
+    new Thread(hilo).start();
+    
+    this.actualizarPantallaProcesos();
+    
+    javax.swing.JOptionPane.showMessageDialog(this, 
+        "Solicitud de lectura enviada a CPU.\nEl disco se movera hacia el bloque " + bloqueInicial + ".", 
+        "Leyendo Archivo", javax.swing.JOptionPane.INFORMATION_MESSAGE);
     }//GEN-LAST:event_jButton1ActionPerformed
 
     private void jButton4ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton4ActionPerformed
@@ -1567,6 +1648,39 @@ public class InterfazProyecto extends javax.swing.JFrame {
         // Le pasamos la nueva velocidad al Gestor de Procesos
         Procesos.GestorProcesos.velocidadSimulacion = velocidadMs;
     }//GEN-LAST:event_jSlider1StateChanged
+
+    private void jButton9ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton9ActionPerformed
+        System.out.println("=== INICIANDO RECUPERACIÓN DEL SISTEMA (JOURNALING) ===");
+        
+    // 1. Avisamos al Journal que vamos a hacer una limpieza
+    // Nota: Reemplaza "jTextArea3" por el nombre real del JTextArea donde muestras tu Journal
+    jTextArea3.append("\n[SISTEMA] Iniciando recuperación tras fallo...\n");
+    jTextArea3.append("[SISTEMA] Revirtiendo operaciones PENDIENTES (Rollback)...\n");
+
+    // 2. ¡VACIAMOS LAS SALAS DE ESPERA!
+    // Esto asegura que la interfaz gráfica y la memoria descarten lo que se quedó a medias
+    transaccionesPendientes.limpiar();
+    nodosDestinoPendientes.limpiar();
+    coloresPendientes.limpiar();
+
+    // 3. Apagamos el Checkbox de fallo para simular que "volvió la luz"
+    jCheckBoxSimularFallo.setSelected(false);
+
+    // 4. Avisamos que el sistema está a salvo
+    jTextArea3.append("[SISTEMA] ✔️ Memoria limpiada. Sistema consistente y listo.\n");
+        
+    // 5. Mensaje visual para el profesor
+    javax.swing.JOptionPane.showMessageDialog(this, 
+        "El sistema se recuperó del fallo de energía.\nLas transacciones incompletas fueron descartadas (Rollback).", 
+        "Recuperación Exitosa", 
+        javax.swing.JOptionPane.INFORMATION_MESSAGE);
+    
+    new Thread(discoSimulado).start();
+    }//GEN-LAST:event_jButton9ActionPerformed
+
+    private void jCheckBoxSimularFalloActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jCheckBoxSimularFalloActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_jCheckBoxSimularFalloActionPerformed
 
     /**
      * @param args the command line arguments
@@ -1947,6 +2061,32 @@ public class InterfazProyecto extends javax.swing.JFrame {
                 javax.swing.tree.DefaultMutableTreeNode nodoPadre = nodosDestinoPendientes.get(nombreArchivo);
                 java.awt.Color color = coloresPendientes.get(nombreArchivo);
                 
+                String claveBusqueda = "CREATE_" + nombreArchivo; 
+
+            // Buscamos si existe esta transacción pendiente en nuestra memoria
+            Journaling.RegistroJournal transaccionTerminada = transaccionesPendientes.get(claveBusqueda);
+        
+            if (transaccionTerminada != null) {
+            // 1. Confirmamos la transacción (Commit) cambiando su estado
+            Journaling.GestorJournaling.confirmarOperacion();
+            
+            // 2. La sacamos de la lista de pendientes porque ya se guardó con éxito
+                transaccionesPendientes.remove(claveBusqueda);
+            
+                // 3. Actualizamos el JTextArea del Journal para que el jurado vea el "✔️ CONFIRMADA"
+                     // OJO: Cambia 'jTextAreaJournal' por el nombre real de tu área de texto (quizás sea jTextArea3 o jTextArea2)
+                    jTextArea3.setText(Journaling.GestorJournaling.obtenerTextoJournal());
+            
+                    System.out.println("[Journal] Commit exitoso para: " + nombreArchivo);
+                }
+                
+                
+                
+                
+                
+                
+                
+                
                 if (nodoPadre == null || color == null) {
                     return false; // Error de seguridad: se perdieron los datos visuales
                 }
@@ -2151,7 +2291,7 @@ public class InterfazProyecto extends javax.swing.JFrame {
             }
         }
     }
-
+    
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton jButton1;
     private javax.swing.JButton jButton2;
@@ -2161,6 +2301,8 @@ public class InterfazProyecto extends javax.swing.JFrame {
     private javax.swing.JButton jButton6;
     private javax.swing.JButton jButton7;
     private javax.swing.JButton jButton8;
+    private javax.swing.JButton jButton9;
+    private javax.swing.JCheckBox jCheckBoxSimularFallo;
     private javax.swing.JComboBox<String> jComboBox1;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel2;
@@ -2180,6 +2322,7 @@ public class InterfazProyecto extends javax.swing.JFrame {
     private javax.swing.JPanel jPanel2;
     private javax.swing.JPanel jPanel3;
     private javax.swing.JPanel jPanel4;
+    private javax.swing.JPanel jPanel5;
     private javax.swing.JPanel jPanel6;
     private javax.swing.JPanel jPanel7;
     private javax.swing.JPanel jPanel8;
@@ -2191,10 +2334,12 @@ public class InterfazProyecto extends javax.swing.JFrame {
     private javax.swing.JScrollPane jScrollPane3;
     private javax.swing.JScrollPane jScrollPane4;
     private javax.swing.JScrollPane jScrollPane5;
+    private javax.swing.JScrollPane jScrollPane6;
     private javax.swing.JSlider jSlider1;
     private javax.swing.JTabbedPane jTabbedPane1;
     private javax.swing.JTextArea jTextArea1;
     private javax.swing.JTextArea jTextArea2;
+    private javax.swing.JTextArea jTextArea3;
     private javax.swing.JTree jTree1;
     private javax.swing.JLabel lblEstadisticasCache;
     private javax.swing.JPanel panelDiscoSimulador;

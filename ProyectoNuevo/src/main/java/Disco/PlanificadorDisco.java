@@ -104,9 +104,9 @@ public class PlanificadorDisco implements Runnable {
                         
                         // SIMULACIÓN DE TIEMPO FÍSICO (Movimiento del brazo)
                         Thread.sleep(500); 
-                        
-                        Journaling.GestorJournaling.confirmarOperacion();
-                        System.out.println("[Disco] Operacion en bloque " + destino + " finalizada.");
+
+                            Journaling.GestorJournaling.confirmarOperacion();
+                            System.out.println("[Disco] Operacion en bloque " + destino + " finalizada.");
                         
                     } else {
                         // ERA UNA PETICIÓN FANTASMA (El usuario borró el archivo en plena simulación)
