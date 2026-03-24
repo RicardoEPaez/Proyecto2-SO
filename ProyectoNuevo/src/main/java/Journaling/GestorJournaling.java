@@ -66,4 +66,17 @@ public class GestorJournaling {
         }
         System.out.println("[Journal] Recuperación completada.\n");
     }
+    
+    // --- NUEVO: MÉTODO PARA EL JTEXTAREA ---
+    public static String obtenerTextoJournal() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < tope; i++) {
+            RegistroJournal log = bitacora[i];
+            sb.append("[").append(i + 1).append("] ");
+            sb.append(log.getTipoOperacion()).append(" -> '").append(log.getNombreArchivo()).append("' ");
+            sb.append("(Bloque: ").append(log.getBloqueInvolucrado()).append(") - ");
+            sb.append(log.isConfirmado() ? "✔️ CONFIRMADA\n" : "⚠️ PENDIENTE / REVERTIDA\n");
+        }
+        return sb.toString();
+    }
 }

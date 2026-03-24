@@ -4,6 +4,7 @@
  */
 package Disco;
 
+import Interfaz.InterfazProyecto;
 import Procesos.GestorProcesos;
 import Procesos.SolicitudIO;
 import estructuras.Cola;
@@ -22,11 +23,14 @@ public class PlanificadorDisco implements Runnable {
     // Estado del disco que las políticas necesitan conocer
     private int cabezalActual;
     private direccionScan direccionActual;
-    public static final int MAX_BLOQUES = 100; // El tamaño total del disco
+    public static final int MAX_BLOQUES = 250; // El tamaño total del disco
 
     private Cola<SolicitudIO> colaCompartida;
     private volatile boolean enFuncionamiento;
     private Semaphore semaforoPeticiones;
+    
+    private InterfazProyecto interfazGrafica;
+    private SolicitudIO peticionActual;
     
     public PlanificadorDisco(Cola<SolicitudIO> colaCompartida) {
         // Por defecto, empezamos con FIFO y en la posición 0
@@ -45,7 +49,7 @@ public class PlanificadorDisco implements Runnable {
     }
     
     
-     // ==========================================
+    // ==========================================
     // EL MOTOR DEL DISCO (HILO CONSUMIDOR)
     // ==========================================
     @Override
@@ -57,29 +61,73 @@ public class PlanificadorDisco implements Runnable {
                 // NUEVO: El disco se queda DORMIDO aquí sin gastar CPU hasta que alguien haga release()
                 semaforoPeticiones.acquire(); 
                 
+                // --- NUEVO: ¿Estamos en pausa? ---
+                if (this.interfazGrafica != null) {
+                    this.interfazGrafica.verificarPausa(); 
+                }
+                
                 // Si despertó, es porque seguro hay algo en la cola
                 SolicitudIO seleccionada = seleccionarSiguiente(colaCompartida);
+                this.peticionActual = seleccionada;
+                
+                if (this.interfazGrafica != null) {
+                    this.interfazGrafica.actualizarPantallaProcesos(); // <--- AVISAMOS QUE ALGO SALIÓ DE LA COLA
+                }
                 
                 if (seleccionada != null) {
                     int destino = seleccionada.getBloqueObjetivo();
-                    Journaling.GestorJournaling.registrarOperacion(new Journaling.RegistroJournal(
-                        seleccionada.getTipo().toString(), 
-                        seleccionada.getRuta(), 
-                        seleccionada.getBloqueObjetivo()
-                    ));
                     
-                    System.out.println("[Disco] Moviendo cabezal a bloque " + destino + " (Usando: " + getPoliticaActual() + ")");
+                    // 1. Delegamos la validación visual y de concurrencia a la Interfaz
+                    boolean operacionExitosa = true;
+                    if (this.interfazGrafica != null) {
+                        operacionExitosa = this.interfazGrafica.ejecutarPeticionEnDiscoSegura(seleccionada);
+                    } else {
+                        System.out.println(">> ERROR: interfazGrafica es NULL, no puedo validar ni pintar.");
+                    }
                     
-                    // SIMULACIÓN DE TIEMPO FÍSICO (Movimiento del brazo)
-                    Thread.sleep(500); 
+                    // 2. Comprobamos si el bloque seguía existiendo
+                    if (operacionExitosa) {
+                        
+                        if (this.interfazGrafica != null) {
+                            String nombreArchivo = seleccionada.getRuta(); 
+                            this.interfazGrafica.procesarPeticionCache(destino, nombreArchivo);
+                        }
+
+                        // SÍ ERA UN BLOQUE VÁLIDO: Registramos y hacemos el movimiento
+                        Journaling.GestorJournaling.registrarOperacion(new Journaling.RegistroJournal(
+                            seleccionada.getTipo().toString(), 
+                            seleccionada.getRuta(), 
+                            destino
+                        ));
+                        
+                        System.out.println("[Disco] Moviendo cabezal a bloque " + destino + " (Usando: " + getPoliticaActual() + ")");
+                        
+                        // SIMULACIÓN DE TIEMPO FÍSICO (Movimiento del brazo)
+                        try {
+                                // En lugar de Thread.sleep(500);
+                                Thread.sleep(Procesos.GestorProcesos.velocidadSimulacion); 
+                            } catch (InterruptedException e) {
+                                // Manejo de error
+                            } 
+
+                            Journaling.GestorJournaling.confirmarOperacion();
+                            System.out.println("[Disco] Operacion en bloque " + destino + " finalizada.");
+                        
+                    } else {
+                        // ERA UNA PETICIÓN FANTASMA (El usuario borró el archivo en plena simulación)
+                        System.out.println("[Disco] ALERTA: Se ignoro la peticion al bloque " + destino + " porque esta vacio o fue eliminado.");
+                    }
                     
-                    // CORRECCIÓN: El commit ahora está DESPUÉS del movimiento físico
-                    Journaling.GestorJournaling.confirmarOperacion();
-                    
-                    System.out.println("[Disco] Operación en bloque " + destino + " finalizada.");
-                    
-                    // Notifica al PCB
+                    // 3. Notifica al PCB (¡MUY IMPORTANTE!)
+                    // Independientemente de si fue exitosa o fantasma, hay que avisarle al Gestor 
+                    // de Procesos que la IO terminó para que el proceso no se quede BLOQUEADO para siempre.
                     GestorProcesos.notificarFinIO(seleccionada.getIdProceso());
+                    
+                    this.peticionActual = null;
+                    
+                    if (this.interfazGrafica != null) {
+                        this.interfazGrafica.actualizarPantallaProcesos(); // <--- AVISAMOS QUE TERMINÓ EL PROCESO
+                    }
                 }
                 
             } catch (InterruptedException e) {
@@ -97,7 +145,7 @@ public class PlanificadorDisco implements Runnable {
      */
     public void setPolitica(Planificacion nuevaPolitica) {
         this.politicaActual = nuevaPolitica;
-        System.out.println("Política de planificación cambiada a: " + nuevaPolitica.getClass().getSimpleName());
+        System.out.println("Politica de planificacion cambiada a: " + nuevaPolitica.getClass().getSimpleName());
     }
 
     /**
@@ -154,4 +202,17 @@ public class PlanificadorDisco implements Runnable {
     // Getters para que la UI pueda mostrar el estado
     public int getCabezalActual() { return cabezalActual; }
     public String getPoliticaActual() { return this.politicaActual.getClass().getSimpleName(); }
+    
+    
+    public void setInterfazGrafica(InterfazProyecto ui) {
+    this.interfazGrafica = ui;
+        }
+    
+    public estructuras.Cola<Procesos.SolicitudIO> getColaCompartida() {
+        return this.colaCompartida;
+    }
+    
+    public SolicitudIO getPeticionActual() { 
+        return this.peticionActual; 
+    }
 }

@@ -112,4 +112,14 @@ public class GestorJSON {
         
         return nuevoDir;
     }
+    
+    public static org.json.JSONObject cargarPruebaSimulacion(String rutaFisica) {
+        try {
+            String contenido = new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(rutaFisica)));
+            return new org.json.JSONObject(contenido);
+        } catch (java.io.IOException | org.json.JSONException e) {
+            System.err.println("Error al cargar la prueba de simulación: " + e.getMessage());
+            return null;
+        }
+    }
 }

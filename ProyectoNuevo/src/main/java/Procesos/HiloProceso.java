@@ -17,17 +17,20 @@ public class HiloProceso implements Runnable {
     private PCB proceso;
     private Cola<SolicitudIO> colaCompartida;
     private PlanificadorDisco disco;
+    private Interfaz.InterfazProyecto interfaz;
 
     /**
      * Constructor del hilo.
      * @param proceso El PCB con la información del proceso y su solicitud.
      * @param colaCompartida La misma cola que lee el PlanificadorDisco.
      * @param disco Referencia al disco para poder "despertarlo".
+     * @param interfaz para conectar con la interfaz del proyecto
      */
-    public HiloProceso(PCB proceso, Cola<SolicitudIO> colaCompartida, PlanificadorDisco disco) {
+    public HiloProceso(PCB proceso, Cola<SolicitudIO> colaCompartida, PlanificadorDisco disco, Interfaz.InterfazProyecto interfaz) {
         this.proceso = proceso;
         this.colaCompartida = colaCompartida;
         this.disco = disco;
+        this.interfaz = interfaz; // NUEVO
     }
 
     @Override
@@ -36,6 +39,7 @@ public class HiloProceso implements Runnable {
             // 1. Simulación de ráfaga de CPU
             // El proceso pasa a EJECUTANDO simulando que el SO le dio CPU
             proceso.setEstado(Estado.EJECUTANDO);
+            interfaz.actualizarPantallaProcesos();
             System.out.println("[CPU] El proceso " + proceso.getNombre() + " (PID: " + proceso.getId() + ") está ejecutándose.");
             
             // Hacemos que el hilo duerma un tiempo aleatorio entre 100ms y 1000ms.
@@ -62,6 +66,7 @@ public class HiloProceso implements Runnable {
                 // 5. Cambio de Estado
                 // Como las operaciones de disco son lentas, el proceso cede la CPU y se bloquea.
                 proceso.setEstado(Estado.BLOQUEADO);
+                interfaz.actualizarPantallaProcesos();
                 System.out.println("[Gestor] Proceso " + proceso.getId() + " pasa a BLOQUEADO esperando al disco.");
                 
             } else {
