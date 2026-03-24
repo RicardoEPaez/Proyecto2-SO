@@ -11,4 +11,11 @@
         <maven.compiler.target>22</maven.compiler.target>
         <exec.mainClass>com.mycompany.proyectonuevo.ProyectoNuevo</exec.mainClass>
     </properties>
+    <dependencies>
+        <dependency>
+            <groupId>org.json</groupId>
+            <artifactId>json</artifactId>
+            <version>20240303</version>
+        </dependency>
+    </dependencies>
 </project>
