@@ -98,7 +98,7 @@ public class InterfazProyecto extends javax.swing.JFrame {
             return false;
         }
     }
-
+ 
     // Nuestro objeto para guardar la info del bloque
     class RegistroCache {
         int bloque;
@@ -132,7 +132,7 @@ public class InterfazProyecto extends javax.swing.JFrame {
         
         inicializarDiscoVisual();
         
-        actualizarCabezalVisual(50);
+        actualizarCabezalVisual(0);
         
         // Renderizador para la columna 0 ("Nombre Archivo")
         tablaAsignacion.getColumnModel().getColumn(0).setCellRenderer(new javax.swing.table.DefaultTableCellRenderer() {
@@ -154,13 +154,13 @@ public class InterfazProyecto extends javax.swing.JFrame {
         });
         
         
-
+ 
         
         // 1. Inicializamos el planificador de disco vacio
         estructuras.Cola<Procesos.SolicitudIO> colaIO = new estructuras.Cola<>();
         discoSimulado = new Disco.PlanificadorDisco(colaIO);
         discoSimulado.setInterfazGrafica(this); 
-        discoSimulado.setCabezal(50);
+        discoSimulado.setCabezal(0);
         discoSimulado.setPolitica(new politicas.FIFO()); // Política por defecto
         new Thread(discoSimulado).start(); 
         
@@ -212,15 +212,15 @@ public class InterfazProyecto extends javax.swing.JFrame {
             bloque.setBorder(javax.swing.BorderFactory.createLineBorder(java.awt.Color.GRAY));
             bloque.setBackground(java.awt.Color.LIGHT_GRAY);
             coloresBloques[i] = java.awt.Color.LIGHT_GRAY;
-
+ 
             javax.swing.JLabel lblNumero = new javax.swing.JLabel(String.valueOf(i), javax.swing.SwingConstants.CENTER);
             lblNumero.setFont(new java.awt.Font("SansSerif", java.awt.Font.PLAIN, 10));
             bloque.add(lblNumero, java.awt.BorderLayout.CENTER);
-
+ 
             bloquesDisco[i] = bloque;
             panelDiscoSimulador.add(bloque);
         }
-
+ 
         panelDiscoSimulador.revalidate();
         panelDiscoSimulador.repaint();
     }
@@ -228,7 +228,7 @@ public class InterfazProyecto extends javax.swing.JFrame {
     public final void actualizarCabezalVisual(int nuevaPosicion) {
         // Protección: Si el bloque es mayor a 99, lo mapeamos para que entre en la cuadrícula
         final int posSegura = (nuevaPosicion >= bloquesDisco.length) ? (nuevaPosicion % bloquesDisco.length) : nuevaPosicion;
-
+ 
         javax.swing.SwingUtilities.invokeLater(() -> {
             try {
                 // 1. Despintar el bloque viejo (volverlo gris)
@@ -261,14 +261,14 @@ public class InterfazProyecto extends javax.swing.JFrame {
             System.err.println("Error: No se pudo cargar el archivo JSON de prueba.");
             return;
         }
-
+ 
         try {
             int cabezalInicial = jsonPrueba.getInt("initial_head");
             actualizarCabezalVisual(cabezalInicial); 
             if (discoSimulado != null) {
                 discoSimulado.setCabezal(cabezalInicial);
             }
-
+ 
             org.json.JSONObject systemFiles = jsonPrueba.getJSONObject("system_files");
             for (String key : systemFiles.keySet()) {
                 org.json.JSONObject fileData = systemFiles.getJSONObject(key);
@@ -298,7 +298,7 @@ public class InterfazProyecto extends javax.swing.JFrame {
                 jTree1.expandPath(new javax.swing.tree.TreePath(raizVisual.getPath()));
                 // ------------------------------------------------
             }
-
+ 
             org.json.JSONArray requests = jsonPrueba.getJSONArray("requests");
             for (int i = 0; i < requests.length(); i++) {
                 org.json.JSONObject req = requests.getJSONObject(i);
@@ -339,8 +339,8 @@ public class InterfazProyecto extends javax.swing.JFrame {
                 }
                 // --------------------------------------------
                 
-                // Usamos valores ficticios (1, "Simulacion", 1) para las variables que no importan en la prueba
-                Procesos.SolicitudIO nuevaSolicitud = new Procesos.SolicitudIO(1, tipoOp, nombreReal, 1, posicion);
+                // Creamos la solicitud con el tamaño real leído del JSON
+                Procesos.SolicitudIO nuevaSolicitud = new Procesos.SolicitudIO(1, tipoOp, nombreReal, cantidadBloques, posicion);
                 
                 // Lo metemos a la cola
                 discoSimulado.getColaCompartida().encolar(nuevaSolicitud); 
@@ -367,7 +367,7 @@ public class InterfazProyecto extends javax.swing.JFrame {
         int b = random.nextInt(128) + 128;
         return new java.awt.Color(r, g, b);
     }
-
+ 
     private java.awt.Color hexAColor(String hex) {
         try {
             return java.awt.Color.decode(hex);
@@ -387,7 +387,7 @@ public class InterfazProyecto extends javax.swing.JFrame {
         
         // 2. Guardamos el color en nuestra "memoria" para que la tabla sepa cómo pintarse
         mapaColoresArchivos.put(nombre, colorArchivo);
-
+ 
         // 3. Agregamos la fila a la tabla (Ojo: Ajusté el orden a Nombre, Posición, Bloques 
         // para que coincida con las columnas de tu diseño)
         javax.swing.table.DefaultTableModel modeloTabla = (javax.swing.table.DefaultTableModel) tablaAsignacion.getModel();
@@ -428,7 +428,7 @@ public class InterfazProyecto extends javax.swing.JFrame {
     private void cargarArbolDesdeJSON(String rutaArchivo) {
         Archivo.Directorio raizLogica = Utilidades.GestorJSON.cargarSistema(rutaArchivo);
         javax.swing.tree.DefaultMutableTreeNode raizVisual;
-
+ 
         if (raizLogica != null) {
             System.out.println("[Sistema] Estado del disco cargado desde: " + rutaArchivo);
             raizVisual = new javax.swing.tree.DefaultMutableTreeNode("Disco (C:)");
@@ -496,7 +496,7 @@ public class InterfazProyecto extends javax.swing.JFrame {
         // 3. Refrescamos la UI
         actualizarPantallaCache();
     }
-
+ 
     private void actualizarPantallaCache() {
         StringBuilder sb = new StringBuilder();
         
@@ -1052,11 +1052,7 @@ public class InterfazProyecto extends javax.swing.JFrame {
             }
         }
         
-        // 3. Reiniciamos la posición del cabezal al punto de partida
-        discoSimulado.setCabezal(50);
-        actualizarCabezalVisual(50);
-        
-        // 4. Volvemos a mandar "trabajo" al disco para que arranque
+        // 3. Reiniciamos la posición del cabezal al initial_head del JSON y re-encolamos peticiones
         reiniciarPeticionesSimulacion();
     }//GEN-LAST:event_jComboBox1ActionPerformed
 
@@ -1759,7 +1755,16 @@ public class InterfazProyecto extends javax.swing.JFrame {
                     return; // Salimos del método sin romper el programa
                 }
                 
+                // Resetear el cabezal al valor inicial definido en el JSON
+                if (jsonPrueba.has("initial_head")) {
+                    int cabezalInicial = jsonPrueba.getInt("initial_head");
+                    discoSimulado.setCabezal(cabezalInicial);
+                    actualizarCabezalVisual(cabezalInicial);
+                    System.out.println("[Simulación] Cabezal reiniciado a posición " + cabezalInicial);
+                }
+                
                 org.json.JSONArray requests = jsonPrueba.getJSONArray("requests");
+                org.json.JSONObject systemFiles = jsonPrueba.has("system_files") ? jsonPrueba.getJSONObject("system_files") : null;
                 
                 // Obtenemos la cola existente de tu disco simulado
                 estructuras.Cola<Procesos.SolicitudIO> colaIO = discoSimulado.getColaCompartida();
@@ -1770,16 +1775,29 @@ public class InterfazProyecto extends javax.swing.JFrame {
                     int posicion = req.getInt("pos");
                     String operacionStr = req.getString("op").toUpperCase();
                     
+                    // Resolvemos nombre y tamaño real desde system_files
+                    String nombreReal = "archivo";
+                    int cantidadBloques = 1;
+                    if (systemFiles != null) {
+                        String keyPos = String.valueOf(posicion);
+                        if (systemFiles.has(keyPos)) {
+                            org.json.JSONObject fileData = systemFiles.getJSONObject(keyPos);
+                            nombreReal = fileData.getString("name");
+                            cantidadBloques = fileData.getInt("blocks");
+                        }
+                    }
+                    
                     Procesos.TipoOperacionIO tipoOp;
                     switch (operacionStr) {
                         case "READ": tipoOp = Procesos.TipoOperacionIO.LEER; break;
                         case "UPDATE": tipoOp = Procesos.TipoOperacionIO.ACTUALIZAR; break;
-                        default: tipoOp = Procesos.TipoOperacionIO.ELIMINAR; break;
+                        case "DELETE": tipoOp = Procesos.TipoOperacionIO.ELIMINAR; break;
+                        default: tipoOp = Procesos.TipoOperacionIO.LEER; break;
                     }
                     
                     // Mapeo seguro visual
                     int posVisual = posicion >= bloquesDisco.length ? (posicion % bloquesDisco.length) : posicion;
-                    Procesos.SolicitudIO nuevaSolicitud = new Procesos.SolicitudIO(i, tipoOp, "archivo", 1, posVisual);
+                    Procesos.SolicitudIO nuevaSolicitud = new Procesos.SolicitudIO(i, tipoOp, nombreReal, cantidadBloques, posVisual);
                     
                     // Metemos la solicitud a la cola compartida
                     colaIO.encolar(nuevaSolicitud);
@@ -1978,7 +1996,7 @@ public class InterfazProyecto extends javax.swing.JFrame {
             System.out.println("[UI] Actualizando interfaz: Lectura de " + nombreArchivo + " completada.");
             return true;
         }
-
+ 
         // ===============================================
         // 3. LÓGICA PARA ACTUALIZAR (RENOMBRAR)
         // ===============================================
@@ -1987,7 +2005,11 @@ public class InterfazProyecto extends javax.swing.JFrame {
             String nombreNuevoLimpio = peticion.getNuevoNombre();
             
             javax.swing.tree.DefaultMutableTreeNode nodo = nodosDestinoPendientes.remove("REN_" + nombreAntiguoLimpio);
-            if (nodo == null) return false;
+            if (nodo == null) {
+                // Contexto de simulación: no hay nodo GUI pendiente, pero la posición fue atendida (el cabezal ya se movió).
+                System.out.println("[Simulación] ACTUALIZAR en bloque " + bloqueObj + " (" + nombreArchivo + ") procesado por el disco.");
+                return true;
+            }
             
             boolean esCarpeta = nodo.getUserObject().toString().startsWith("📁");
             String emoji = esCarpeta ? "📁 " : "📄 ";
@@ -2028,7 +2050,25 @@ public class InterfazProyecto extends javax.swing.JFrame {
             int tamanoBloques = peticion.getTamanoEnBloques();
             
             javax.swing.tree.DefaultMutableTreeNode nodo = nodosDestinoPendientes.remove("DEL_" + nombreLimpio);
-            if (nodo == null) return false;
+            if (nodo == null) {
+                // Contexto de simulación: liberamos los bloques del disco visual aunque no haya nodo GUI pendiente.
+                System.out.println("[Simulación] ELIMINAR en bloque " + bloqueInicial + " (" + nombreLimpio + ") procesado por el disco.");
+                if (bloqueInicial != -1 && tamanoBloques > 0) {
+                    synchronized(lockBloques) {
+                        mapaColoresArchivos.remove(nombreLimpio);
+                        for (int i = 0; i < tamanoBloques; i++) {
+                            int posActual = bloqueInicial + i;
+                            if (posActual < coloresBloques.length) {
+                                coloresBloques[posActual] = java.awt.Color.LIGHT_GRAY;
+                                if (posActual != cabezalAnterior && bloquesDisco[posActual] != null) {
+                                    bloquesDisco[posActual].setBackground(java.awt.Color.LIGHT_GRAY);
+                                }
+                            }
+                        }
+                    }
+                }
+                return true;
+            }
             
             boolean esCarpeta = nodo.getUserObject().toString().startsWith("📁");
             
