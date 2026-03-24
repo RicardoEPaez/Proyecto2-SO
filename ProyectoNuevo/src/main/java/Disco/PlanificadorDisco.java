@@ -23,13 +23,14 @@ public class PlanificadorDisco implements Runnable {
     // Estado del disco que las políticas necesitan conocer
     private int cabezalActual;
     private direccionScan direccionActual;
-    public static final int MAX_BLOQUES = 200; // El tamaño total del disco
+    public static final int MAX_BLOQUES = 250; // El tamaño total del disco
 
     private Cola<SolicitudIO> colaCompartida;
     private volatile boolean enFuncionamiento;
     private Semaphore semaforoPeticiones;
     
     private InterfazProyecto interfazGrafica;
+    private SolicitudIO peticionActual;
     
     public PlanificadorDisco(Cola<SolicitudIO> colaCompartida) {
         // Por defecto, empezamos con FIFO y en la posición 0
@@ -67,6 +68,11 @@ public class PlanificadorDisco implements Runnable {
                 
                 // Si despertó, es porque seguro hay algo en la cola
                 SolicitudIO seleccionada = seleccionarSiguiente(colaCompartida);
+                this.peticionActual = seleccionada;
+                
+                if (this.interfazGrafica != null) {
+                    this.interfazGrafica.actualizarPantallaProcesos(); // <--- AVISAMOS QUE ALGO SALIÓ DE LA COLA
+                }
                 
                 if (seleccionada != null) {
                     int destino = seleccionada.getBloqueObjetivo();
@@ -111,6 +117,12 @@ public class PlanificadorDisco implements Runnable {
                     // Independientemente de si fue exitosa o fantasma, hay que avisarle al Gestor 
                     // de Procesos que la IO terminó para que el proceso no se quede BLOQUEADO para siempre.
                     GestorProcesos.notificarFinIO(seleccionada.getIdProceso());
+                    
+                    this.peticionActual = null;
+                    
+                    if (this.interfazGrafica != null) {
+                        this.interfazGrafica.actualizarPantallaProcesos(); // <--- AVISAMOS QUE TERMINÓ EL PROCESO
+                    }
                 }
                 
             } catch (InterruptedException e) {
@@ -193,5 +205,9 @@ public class PlanificadorDisco implements Runnable {
     
     public estructuras.Cola<Procesos.SolicitudIO> getColaCompartida() {
         return this.colaCompartida;
+    }
+    
+    public SolicitudIO getPeticionActual() { 
+        return this.peticionActual; 
     }
 }

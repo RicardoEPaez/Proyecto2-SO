@@ -16,7 +16,7 @@ package Procesos;
 public class GestorProcesos {
     
     // Usamos un arreglo fijo en lugar de ArrayList
-    private static final int MAX_PROCESOS = 100;
+    private static final int MAX_PROCESOS = 250;
     private static PCB[] listaProcesos = new PCB[MAX_PROCESOS];
     private static int cantidadProcesos = 0; // Contador para saber cuántos procesos hay
     public static volatile int velocidadSimulacion = 1000;
@@ -47,10 +47,12 @@ public class GestorProcesos {
             PCB p = listaProcesos[i];
             
             if (p != null && p.getId() == idProceso) {
-                // ¡Lo encontramos! Lo cambiamos de BLOQUEADO a LISTO
-                // (Asumiendo que tienes Estado.LISTO en tu enum)
-                p.setEstado(Estado.LISTO); 
-                System.out.println("[Gestor] ¡Exito! El proceso " + p.getNombre() + " (ID: " + idProceso + ") ha vuelto al estado LISTO.");
+                
+                // --- CAMBIO AQUI ---
+                // Lo pasamos a TERMINADO para que la CPU lo deje en paz
+                p.setEstado(Estado.TERMINADO); 
+                System.out.println("[Gestor] ¡Exito! El proceso " + p.getNombre() + " (ID: " + idProceso + ") ha TERMINADO su ejecución.");
+                
                 return; // Terminamos la búsqueda
             }
         }
@@ -86,53 +88,13 @@ public class GestorProcesos {
     }
     
     // LA CPU (PLANIFICADOR VIRTUAL)  
+    // LA CPU (PLANIFICADOR VIRTUAL)  
     public static void iniciarCPU() {
-        new Thread(() -> {
-            while (true) {
-                try {
-                    // --- NUEVO: PUNTO DE CONTROL DE PAUSA ---
-                    // Si el sistema está pausado, el hilo se quedará congelado en esta línea
-                    verificarPausaCPU();
-                    
-                    // 1. Verificar si la CPU está libre (nadie en EJECUTANDO)
-                    boolean cpuLibre = true;
-                    for (int i = 0; i < cantidadProcesos; i++) {
-                        if (listaProcesos[i] != null && listaProcesos[i].getEstado() == Estado.EJECUTANDO) {
-                            cpuLibre = false;
-                            break;
-                        }
-                    }
-                    
-                    // 2. Si la CPU está libre, buscamos al primer proceso LISTO
-                    if (cpuLibre) {
-                        for (int i = 0; i < cantidadProcesos; i++) {
-                            if (listaProcesos[i] != null && listaProcesos[i].getEstado() == Estado.LISTO) {
-                                
-                                // ¡Encontramos uno! Lo metemos a la CPU
-                                listaProcesos[i].setEstado(Estado.EJECUTANDO);
-                                System.out.println("[CPU] " + listaProcesos[i].getNombre() + " entro a EJECUTANDO.");
-                                
-                                // Simulamos que la CPU lo procesa por 2 segundos
-                                Thread.sleep(velocidadSimulacion * 2 ); 
-                                
-                                // Como es una tarea de archivos, lo manda a BLOQUEADO (Esperando al disco)
-                                listaProcesos[i].setEstado(Estado.BLOQUEADO);
-                                System.out.println("[CPU] " + listaProcesos[i].getNombre() + " necesita el Disco. Pasa a BLOQUEADO.");
-                                
-                                break; // Terminamos este ciclo para volver a empezar
-                            }
-                        }
-                    }
-                    
-                    
-                    Thread.sleep(velocidadSimulacion); 
-                    
-                } catch (InterruptedException e) {
-                    System.out.println("[CPU] Detenida.");
-                    break;
-                }
-            }
-        }).start();
+        // ¡MÉTODO DESACTIVADO! 
+        // Ya no usamos este ciclo infinito porque en la "Opción B"
+        // cada petición lanza su propio HiloProceso que simula la CPU
+        // de forma correcta sin causar condiciones de carrera.
+        System.out.println("[Gestor] Hilo de CPU central desactivado. Usando Hilos de Proceso individuales.");
     }
     
     // --- GETTERS NECESARIOS PARA EL REPORTE CSV ---
