@@ -17,18 +17,88 @@ public class InterfazProyecto extends javax.swing.JFrame {
     private String rutaPruebaActual = "";
     private Archivo.Directorio raizLogicaGlobal = new Archivo.Directorio("Disco (C:)", null);
     private java.awt.Color[] coloresBloques = new java.awt.Color[100];
-    private java.util.HashMap<String, java.awt.Color> mapaColoresArchivos = new java.util.HashMap<>();
+    private MapaSimple<String, java.awt.Color> mapaColoresArchivos = new MapaSimple<>();
     private int cicloActual = 0;
     private boolean simulacionIniciada = false;
     private final Object lockBloques = new Object();
     public final Object lockPausa = new Object();
-    private java.util.HashMap<String, javax.swing.tree.DefaultMutableTreeNode> nodosDestinoPendientes = new java.util.HashMap<>();
-    private java.util.HashMap<String, java.awt.Color> coloresPendientes = new java.util.HashMap<>();
-    
+    private MapaSimple<String, javax.swing.tree.DefaultMutableTreeNode> nodosDestinoPendientes = new MapaSimple<>();
+    private MapaSimple<String, java.awt.Color> coloresPendientes = new MapaSimple<>();
     private final int MAX_CACHE = 10;
     private int cacheHits = 0;
     private int cacheMisses = 0;
     
+    // -------------------------------------------------------
+    // Clase interna que representa un par clave-valor.
+    // -------------------------------------------------------
+    private class EntradaMapa<K, V> {
+        K clave;
+        V valor;
+ 
+        EntradaMapa(K clave, V valor) {
+            this.clave = clave;
+            this.valor = valor;
+        }
+    }
+ 
+    // -------------------------------------------------------
+    // Tabla de asociacion propia usando ListaEnlazada interna.
+    // Soporta: put, get, remove (con retorno del valor), containsKey.
+    // Complejidad O(n) — suficiente para los tamanios del simulador.
+    // -------------------------------------------------------
+    private class MapaSimple<K, V> {
+        private estructuras.ListaEnlazada<EntradaMapa<K, V>> lista = new estructuras.ListaEnlazada<>();
+ 
+        /** Inserta o actualiza el valor asociado a la clave. */
+        public void put(K clave, V valor) {
+            for (int i = 0; i < lista.getTamano(); i++) {
+                EntradaMapa<K, V> entrada = lista.get(i);
+                if (entrada.clave.equals(clave)) {
+                    entrada.valor = valor; // actualizar existente
+                    return;
+                }
+            }
+            lista.agregar(new EntradaMapa<>(clave, valor)); // insertar nuevo
+        }
+ 
+        /** Devuelve el valor asociado a la clave, o null si no existe. */
+        public V get(K clave) {
+            for (int i = 0; i < lista.getTamano(); i++) {
+                EntradaMapa<K, V> entrada = lista.get(i);
+                if (entrada.clave.equals(clave)) {
+                    return entrada.valor;
+                }
+            }
+            return null;
+        }
+ 
+        /**
+         * Elimina la entrada con la clave indicada y devuelve su valor.
+         * Devuelve null si la clave no existia (igual que HashMap.remove).
+         */
+        public V remove(K clave) {
+            for (int i = 0; i < lista.getTamano(); i++) {
+                EntradaMapa<K, V> entrada = lista.get(i);
+                if (entrada.clave.equals(clave)) {
+                    V valorGuardado = entrada.valor;
+                    lista.eliminar(entrada);
+                    return valorGuardado;
+                }
+            }
+            return null;
+        }
+ 
+        /** Indica si la clave existe en el mapa. */
+        public boolean containsKey(K clave) {
+            for (int i = 0; i < lista.getTamano(); i++) {
+                if (lista.get(i).clave.equals(clave)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
     // Nuestro objeto para guardar la info del bloque
     class RegistroCache {
         int bloque;
