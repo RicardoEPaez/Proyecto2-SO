@@ -219,7 +219,7 @@ public class InterfazProyecto extends javax.swing.JFrame {
                 // 2. Lo agregamos visualmente al JTree para que aparezca en pantalla
                 javax.swing.tree.DefaultTreeModel modeloArbol = (javax.swing.tree.DefaultTreeModel) jTree1.getModel();
                 javax.swing.tree.DefaultMutableTreeNode raizVisual = (javax.swing.tree.DefaultMutableTreeNode) modeloArbol.getRoot();
-                javax.swing.tree.DefaultMutableTreeNode nuevoNodoArch = new javax.swing.tree.DefaultMutableTreeNode("📄 " + nombreArchivo);
+                javax.swing.tree.DefaultMutableTreeNode nuevoNodoArch = new javax.swing.tree.DefaultMutableTreeNode("📄 " + nombreArchivo + " (" + cantidadBloques + " bloques)");
                 
                 // Lo insertamos en la interfaz gráfica
                 modeloArbol.insertNodeInto(nuevoNodoArch, raizVisual, raizVisual.getChildCount());
@@ -389,7 +389,7 @@ public class InterfazProyecto extends javax.swing.JFrame {
             } else if (elemento instanceof Archivo.Archivo) {
                 // Si el elemento es un archivo normal
                 Archivo.Archivo arch = (Archivo.Archivo) elemento;
-                javax.swing.tree.DefaultMutableTreeNode nuevoNodoArch = new javax.swing.tree.DefaultMutableTreeNode("📄 " + arch.getNombre());
+                javax.swing.tree.DefaultMutableTreeNode nuevoNodoArch = new javax.swing.tree.DefaultMutableTreeNode("📄 " + arch.getNombre() + " (" + arch.getTamanoEnBloques() + " bloques)");
                 nodoVisual.add(nuevoNodoArch);
             }
         }
