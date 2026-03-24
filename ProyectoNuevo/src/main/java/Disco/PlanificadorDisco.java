@@ -103,7 +103,12 @@ public class PlanificadorDisco implements Runnable {
                         System.out.println("[Disco] Moviendo cabezal a bloque " + destino + " (Usando: " + getPoliticaActual() + ")");
                         
                         // SIMULACIÓN DE TIEMPO FÍSICO (Movimiento del brazo)
-                        Thread.sleep(500); 
+                        try {
+                                // En lugar de Thread.sleep(500);
+                                Thread.sleep(Procesos.GestorProcesos.velocidadSimulacion); 
+                            } catch (InterruptedException e) {
+                                // Manejo de error
+                            } 
 
                             Journaling.GestorJournaling.confirmarOperacion();
                             System.out.println("[Disco] Operacion en bloque " + destino + " finalizada.");
